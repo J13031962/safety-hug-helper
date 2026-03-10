@@ -32,10 +32,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchRole = useCallback(async (userId: string) => {
     try {
-      const { data, error } = await withTimeout(
-        supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle(),
+      const result = await withTimeout(
+        supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle() as Promise<{ data: { role: AppRole } | null; error: any }>,
         5000
       );
+      const { data, error } = result;
       if (error) {
         // Fallback: try RPC
         const { data: hasAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" as AppRole });
