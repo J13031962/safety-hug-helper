@@ -1,0 +1,2 @@
+ALTER TABLE public.alarms DROP CONSTRAINT alarms_status_check;
+ALTER TABLE public.alarms ADD CONSTRAINT alarms_status_check CHECK (status = ANY (ARRAY['pending'::text, 'processing'::text, 'resolved'::text]));
