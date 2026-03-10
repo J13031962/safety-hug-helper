@@ -27,7 +27,7 @@ interface ConfirmDialogProps {
 
 type DialogState = "confirm" | "sending" | "success" | "not_registered";
 
-export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProps) {
+export default function ConfirmDialog({ open, type, onClose, initialLocation }: ConfirmDialogProps) {
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState(5);
   const [state, setState] = useState<DialogState>("confirm");
