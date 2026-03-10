@@ -99,7 +99,7 @@ export default function LoginPage() {
           <div className="flex justify-center mb-2">
             <Shield className="w-12 h-12 text-emergency-panic" />
           </div>
-          <CardTitle className="text-2xl font-display">TeleGuardia</CardTitle>
+          <CardTitle className="text-2xl font-display">SOS Alerta</CardTitle>
           <CardDescription>
             {!hasAdmin
               ? "No hay administradores. Configura el primer admin."

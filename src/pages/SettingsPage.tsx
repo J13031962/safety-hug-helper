@@ -24,12 +24,12 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("teleguardia_settings") || "{}");
+    const saved = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
     setSettings((s) => ({ ...s, ...saved }));
   }, []);
 
   const handleSave = () => {
-    localStorage.setItem("teleguardia_settings", JSON.stringify(settings));
+    localStorage.setItem("sosalerta_settings", JSON.stringify(settings));
     toast({ title: "Guardado", description: "Configuración guardada correctamente" });
   };
 

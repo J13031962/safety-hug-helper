@@ -71,7 +71,7 @@ export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProp
     if (!type || sending) return;
     setSending(true);
 
-    const settings = JSON.parse(localStorage.getItem("teleguardia_settings") || "{}");
+    const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
 
     const alarmData = {
       alarm_type: type,
