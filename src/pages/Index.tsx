@@ -91,6 +91,7 @@ const IndexContent = () => {
         open={dialogOpen}
         type={selectedType}
         onClose={() => setDialogOpen(false)}
+        initialLocation={locationRef.current}
       />
     </div>
   );
