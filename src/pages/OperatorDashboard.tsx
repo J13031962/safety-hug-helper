@@ -26,6 +26,7 @@ export default function OperatorDashboard() {
   const [selectedAlarm, setSelectedAlarm] = useState<Alarm | null>(null);
   const [observations, setObservations] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
