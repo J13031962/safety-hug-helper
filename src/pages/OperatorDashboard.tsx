@@ -71,6 +71,10 @@ export default function OperatorDashboard() {
   }, []);
 
   const handleProcess = async (alarm: Alarm, newStatus: string) => {
+    if (newStatus === "resolved" && !observations.trim()) {
+      toast({ title: "Observación requerida", description: "Debe escribir una observación para resolver la alarma.", variant: "destructive" });
+      return;
+    }
     setProcessing(true);
     const updateData: Record<string, any> = {
       status: newStatus,
@@ -78,7 +82,7 @@ export default function OperatorDashboard() {
     };
     if (newStatus === "resolved") {
       updateData.processed_at = new Date().toISOString();
-      updateData.observations = observations || null;
+      updateData.observations = observations.trim();
     }
 
     const { error } = await supabase.from("alarms").update(updateData).eq("id", alarm.id);
@@ -252,7 +256,7 @@ export default function OperatorDashboard() {
                             size="sm"
                             className="bg-green-600 hover:bg-green-700 text-foreground"
                             onClick={() => handleProcess(alarm, "resolved")}
-                            disabled={processing}
+                            disabled={processing || (selectedAlarm?.id === alarm.id ? !observations.trim() : true)}
                           >
                             <CheckCircle className="w-3 h-3 mr-1" /> Resolver
                           </Button>
