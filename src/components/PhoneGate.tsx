@@ -139,6 +139,14 @@ export default function PhoneGate({ children }: PhoneGateProps) {
               "Ingresar"
             )}
           </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => window.location.href = "/"}
+            className="w-full h-10"
+          >
+            Cerrar
+          </Button>
         </div>
 
         <p className="text-xs text-muted-foreground text-center">

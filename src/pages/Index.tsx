@@ -12,6 +12,7 @@ const Index = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [gpsActive, setGpsActive] = useState(false);
   const [userName, setUserName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +24,7 @@ const Index = () => {
     }
     const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
     setUserName(settings.senderName || "");
+    setPhoneNumber((settings.phoneNumber || "").replace(/\D/g, ""));
   }, []);
 
   const handleSelect = (type: AlarmType) => {
@@ -53,9 +55,11 @@ const Index = () => {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => navigate("/plataforma")} className="text-muted-foreground hover:text-foreground transition-colors">
-                <Activity className="w-5 h-5" />
-              </button>
+              {phoneNumber.endsWith("3332840057") && (
+                <button onClick={() => navigate("/plataforma")} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <Activity className="w-5 h-5" />
+                </button>
+              )}
               <button onClick={handleLogout} className="text-muted-foreground hover:text-emergency-panic transition-colors" title="Cerrar sesión">
                 <LogOut className="w-5 h-5" />
               </button>
