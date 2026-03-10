@@ -6,7 +6,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { AlertCircle, CheckCircle2, MapPin, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, MapPin, Loader2, ShieldX } from "lucide-react";
 
 type AlarmType = "panic" | "medical" | "fire" | "disaster";
 
@@ -23,7 +23,7 @@ interface ConfirmDialogProps {
   onClose: () => void;
 }
 
-type DialogState = "confirm" | "sending" | "success";
+type DialogState = "confirm" | "sending" | "success" | "not_registered";
 
 export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProps) {
   const [countdown, setCountdown] = useState(5);
@@ -32,6 +32,7 @@ export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProp
   const [locating, setLocating] = useState(false);
   const [whatsappWarning, setWhatsappWarning] = useState<string | null>(null);
 
+  // Check registration and get location when dialog opens
   useEffect(() => {
     if (!open) {
       setState("confirm");
@@ -40,24 +41,54 @@ export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProp
       setWhatsappWarning(null);
       return;
     }
+
+    // Check if user is registered
+    const checkRegistration = async () => {
+      const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
+      const phone = settings.phoneNumber?.trim();
+      
+      if (!phone) {
+        setState("not_registered");
+        return;
+      }
+
+      const { data } = await supabase
+        .from("registered_numbers")
+        .select("id")
+        .eq("phone_number", phone)
+        .maybeSingle();
+
+      if (!data) {
+        setState("not_registered");
+        return;
+      }
+
+      setState("confirm");
+    };
+
+    checkRegistration();
+
+    // Get location
     setLocating(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
         () => { setLocation(null); setLocating(false); },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 10000 }
       );
     } else {
       setLocating(false);
     }
   }, [open]);
 
+  // Countdown timer
   useEffect(() => {
     if (!open || state !== "confirm" || countdown <= 0) return;
     const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(timer);
   }, [open, state, countdown]);
 
+  // Auto-send when countdown reaches 0
   useEffect(() => {
     if (open && countdown === 0 && state === "confirm") {
       handleSend();
@@ -112,8 +143,28 @@ export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProp
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v && state !== "sending") handleClose(); }}>
-      <DialogContent className="sm:max-w-md border-border p-0 overflow-hidden">
-        {state === "success" ? (
+      <DialogContent className="sm:max-w-md border-border p-0 overflow-hidden [&>button.absolute]:hidden">
+
+        {state === "not_registered" ? (
+          /* ── Not Registered Screen ── */
+          <div className="flex flex-col items-center gap-4 p-8">
+            <div className="w-16 h-16 rounded-full border-2 border-emergency-panic/50 flex items-center justify-center">
+              <ShieldX className="w-10 h-10 text-emergency-panic" />
+            </div>
+            <h2 className="text-xl font-display font-bold">No Registrado</h2>
+            <p className="text-sm text-muted-foreground text-center">
+              Su número no se encuentra registrado en el sistema. Comuníquese con la empresa para gestionar los permisos de acceso.
+            </p>
+            <div className="w-full rounded-lg border border-emergency-disaster/40 bg-emergency-disaster/10 p-3 text-xs text-emergency-disaster flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>Contacte al administrador para registrar su número y poder enviar alertas de emergencia.</span>
+            </div>
+            <Button variant="outline" onClick={handleClose} className="mt-2 w-full">
+              Cerrar
+            </Button>
+          </div>
+
+        ) : state === "success" ? (
           /* ── Success Screen ── */
           <div className="flex flex-col items-center gap-4 p-8">
             <div className="w-16 h-16 rounded-full border-2 border-emergency-medical flex items-center justify-center">
@@ -133,6 +184,7 @@ export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProp
               Cerrar
             </Button>
           </div>
+
         ) : (
           /* ── Confirm / Sending Screen ── */
           <div className="p-6">
