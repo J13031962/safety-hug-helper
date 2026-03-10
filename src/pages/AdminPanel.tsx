@@ -59,7 +59,7 @@ export default function AdminPanel() {
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 py-6">
         <Tabs defaultValue="users">
-          <TabsList className="grid w-full grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-6 mb-6">
             <TabsTrigger value="users" className="gap-1 text-xs sm:text-sm">
               <Users className="w-4 h-4" /> <span className="hidden sm:inline">Usuarios</span>
             </TabsTrigger>
