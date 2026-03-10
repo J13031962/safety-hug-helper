@@ -26,6 +26,7 @@ export default function OperatorDashboard() {
   const [selectedAlarm, setSelectedAlarm] = useState<Alarm | null>(null);
   const [observations, setObservations] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
@@ -105,6 +106,8 @@ export default function OperatorDashboard() {
   const processingAlarms = alarms.filter((a) => a.status === "processing");
   const resolvedAlarms = alarms.filter((a) => a.status === "resolved");
 
+  const filteredAlarms = statusFilter ? alarms.filter((a) => a.status === statusFilter) : alarms;
+
   const roleLabel = role === "director_monitoreo" ? "Director Central" : role === "operator" ? "Operador" : role === "supervisor_central" ? "Supervisor" : "Admin";
 
   return (
@@ -142,21 +145,30 @@ export default function OperatorDashboard() {
       <main className="max-w-6xl mx-auto px-4 py-6">
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <Card className="border-emergency-panic/30">
+          <Card
+            className={`border-emergency-panic/30 cursor-pointer transition-all ${statusFilter === "pending" ? "ring-2 ring-emergency-panic" : "hover:bg-muted/30"}`}
+            onClick={() => setStatusFilter(statusFilter === "pending" ? null : "pending")}
+          >
             <CardContent className="p-4 text-center">
               <AlertTriangle className="w-5 h-5 text-emergency-panic mx-auto mb-1" />
               <div className="text-2xl font-display font-bold text-emergency-panic">{pendingAlarms.length}</div>
               <div className="text-xs text-muted-foreground">Pendientes</div>
             </CardContent>
           </Card>
-          <Card className="border-emergency-medical/30">
+          <Card
+            className={`border-emergency-medical/30 cursor-pointer transition-all ${statusFilter === "processing" ? "ring-2 ring-emergency-medical" : "hover:bg-muted/30"}`}
+            onClick={() => setStatusFilter(statusFilter === "processing" ? null : "processing")}
+          >
             <CardContent className="p-4 text-center">
               <Clock className="w-5 h-5 text-emergency-medical mx-auto mb-1" />
               <div className="text-2xl font-display font-bold text-emergency-medical">{processingAlarms.length}</div>
               <div className="text-xs text-muted-foreground">En proceso</div>
             </CardContent>
           </Card>
-          <Card className="border-green-500/30">
+          <Card
+            className={`border-green-500/30 cursor-pointer transition-all ${statusFilter === "resolved" ? "ring-2 ring-green-500" : "hover:bg-muted/30"}`}
+            onClick={() => setStatusFilter(statusFilter === "resolved" ? null : "resolved")}
+          >
             <CardContent className="p-4 text-center">
               <CheckCircle className="w-5 h-5 text-green-400 mx-auto mb-1" />
               <div className="text-2xl font-display font-bold text-green-400">{resolvedAlarms.length}</div>
@@ -175,7 +187,7 @@ export default function OperatorDashboard() {
             </Card>
           )}
 
-          {alarms.map((alarm) => {
+          {filteredAlarms.map((alarm) => {
             const cfg = typeConfig[alarm.alarm_type] || typeConfig.panic;
             const isPending = alarm.status === "pending";
             const isProcessing = alarm.status === "processing";
