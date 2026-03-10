@@ -102,8 +102,6 @@ export default function OperatorDashboard() {
 
   if (!user || !role) return null;
 
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-
   const pendingAlarms = alarms.filter((a) => a.status === "pending");
   const processingAlarms = alarms.filter((a) => a.status === "processing");
   const resolvedAlarms = alarms.filter((a) => a.status === "resolved");
