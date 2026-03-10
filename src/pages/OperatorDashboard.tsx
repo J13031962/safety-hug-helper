@@ -27,12 +27,24 @@ export default function OperatorDashboard() {
   const [observations, setObservations] = useState("");
   const [processing, setProcessing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [operatorMap, setOperatorMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
       navigate("/login");
     }
   }, [loading, user, role, navigate]);
+
+  // Fetch operator profiles
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email");
+      const map: Record<string, string> = {};
+      (data || []).forEach((p) => { map[p.user_id] = p.full_name || p.email || "—"; });
+      setOperatorMap(map);
+    };
+    fetchProfiles();
+  }, []);
 
   // Fetch alarms
   useEffect(() => {
