@@ -14,16 +14,176 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      alarms: {
+        Row: {
+          alarm_type: string
+          created_at: string
+          house_number: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          observations: string | null
+          parcel_name: string | null
+          phone_number: string | null
+          processed_at: string | null
+          processed_by: string | null
+          sender_name: string | null
+          status: string
+        }
+        Insert: {
+          alarm_type: string
+          created_at?: string
+          house_number?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          observations?: string | null
+          parcel_name?: string | null
+          phone_number?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          sender_name?: string | null
+          status?: string
+        }
+        Update: {
+          alarm_type?: string
+          created_at?: string
+          house_number?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          observations?: string | null
+          parcel_name?: string | null
+          phone_number?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          sender_name?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      gps_devices: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          imei: string
+          model: string | null
+          sim_number: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          imei: string
+          model?: string | null
+          sim_number?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          imei?: string
+          model?: string | null
+          sim_number?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      registered_numbers: {
+        Row: {
+          callmebot_apikey: string | null
+          created_at: string
+          house_number: string | null
+          id: string
+          owner_name: string
+          parcel_name: string | null
+          phone_number: string
+        }
+        Insert: {
+          callmebot_apikey?: string | null
+          created_at?: string
+          house_number?: string | null
+          id?: string
+          owner_name: string
+          parcel_name?: string | null
+          phone_number: string
+        }
+        Update: {
+          callmebot_apikey?: string | null
+          created_at?: string
+          house_number?: string | null
+          id?: string
+          owner_name?: string
+          parcel_name?: string | null
+          phone_number?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      setup_first_admin: {
+        Args: { _email: string; _full_name: string; _password: string }
+        Returns: Json
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role:
+        | "admin"
+        | "operator"
+        | "director_monitoreo"
+        | "supervisor_central"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +310,13 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: [
+        "admin",
+        "operator",
+        "director_monitoreo",
+        "supervisor_central",
+      ],
+    },
   },
 } as const
