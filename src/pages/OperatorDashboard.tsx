@@ -249,17 +249,22 @@ export default function OperatorDashboard() {
                         <div><span className="text-muted-foreground">Teléfono:</span> {alarm.phone_number || "—"}</div>
                         <div><span className="text-muted-foreground">Casa:</span> {alarm.house_number || "—"}</div>
                         <div><span className="text-muted-foreground">Parcela:</span> {alarm.parcel_name || "—"}</div>
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">Ubicación:</span>{" "}
+                          {alarm.latitude && alarm.longitude ? (
+                            <a
+                              href={`https://maps.google.com/?q=${alarm.latitude},${alarm.longitude}`}
+                              target="_blank"
+                              rel="noopener"
+                              className="inline-flex items-center gap-1 text-emergency-medical hover:underline"
+                            >
+                              <MapPin className="w-3 h-3" /> Ver en Google Maps
+                            </a>
+                          ) : (
+                            <span>—</span>
+                          )}
+                        </div>
                       </div>
-                      {alarm.latitude && alarm.longitude && (
-                        <a
-                          href={`https://maps.google.com/?q=${alarm.latitude},${alarm.longitude}`}
-                          target="_blank"
-                          rel="noopener"
-                          className="inline-flex items-center gap-1 text-xs text-emergency-medical hover:underline mt-2"
-                        >
-                          <MapPin className="w-3 h-3" /> Ver ubicación
-                        </a>
-                      )}
                       {alarm.observations && (
                         <p className="text-xs text-muted-foreground mt-2 italic">Obs: {alarm.observations}</p>
                       )}
