@@ -71,6 +71,10 @@ export default function OperatorDashboard() {
   }, []);
 
   const handleProcess = async (alarm: Alarm, newStatus: string) => {
+    if (newStatus === "resolved" && !observations.trim()) {
+      toast({ title: "Observación requerida", description: "Debe escribir una observación para resolver la alarma.", variant: "destructive" });
+      return;
+    }
     setProcessing(true);
     const updateData: Record<string, any> = {
       status: newStatus,
@@ -78,7 +82,7 @@ export default function OperatorDashboard() {
     };
     if (newStatus === "resolved") {
       updateData.processed_at = new Date().toISOString();
-      updateData.observations = observations || null;
+      updateData.observations = observations.trim();
     }
 
     const { error } = await supabase.from("alarms").update(updateData).eq("id", alarm.id);
