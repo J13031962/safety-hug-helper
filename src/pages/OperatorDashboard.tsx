@@ -188,7 +188,7 @@ export default function OperatorDashboard() {
             </Card>
           )}
 
-          {alarms.map((alarm) => {
+          {filteredAlarms.map((alarm) => {
             const cfg = typeConfig[alarm.alarm_type] || typeConfig.panic;
             const isPending = alarm.status === "pending";
             const isProcessing = alarm.status === "processing";

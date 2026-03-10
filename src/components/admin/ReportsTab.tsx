@@ -102,17 +102,26 @@ export default function ReportsTab() {
     let query = supabase.from("alarms").select("*").order("created_at", { ascending: false });
     query = buildDateFilter(query, "created_at");
     const { data } = await query;
+
+    // Fetch operator profiles for processed_by
+    const operatorIds = [...new Set((data || []).map((a) => a.processed_by).filter(Boolean))] as string[];
+    let operatorMap: Record<string, string> = {};
+    if (operatorIds.length > 0) {
+      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", operatorIds);
+      (profiles || []).forEach((p) => { operatorMap[p.user_id] = p.full_name || p.email || "—"; });
+    }
+
     const rows = (data || []).map((a) => [
       typeLabels[a.alarm_type] || a.alarm_type,
       a.sender_name || "—",
       a.house_number || "—",
-      a.parcel_name || "—",
       statusLabels[a.status] || a.status,
-      a.phone_number || "—",
-      a.observations || "—",
+      a.processed_by ? (operatorMap[a.processed_by] || "—") : "—",
       new Date(a.created_at).toLocaleString("es-VE"),
+      a.processed_at ? new Date(a.processed_at).toLocaleString("es-VE") : "—",
+      a.observations || "—",
     ]);
-    generatePDF("Reporte de Alarmas", ["Tipo", "Remitente", "Casa", "Parcela", "Estado", "Teléfono", "Observaciones", "Fecha"], rows, dateRangeStr);
+    generatePDF("Reporte de Atenciones", ["Tipo", "Remitente", "Casa", "Estado", "Operador", "Hora Llegada", "Hora Atención", "Observaciones"], rows, dateRangeStr);
     setLoading(false);
   };
 
