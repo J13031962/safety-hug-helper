@@ -45,6 +45,30 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       return;
     }
 
+    // Use initialLocation if available
+    if (initialLocation) {
+      setLocation(initialLocation);
+      setLocating(false);
+    } else {
+      // Try to get location
+      setLocating(true);
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+          () => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+              () => { setLocation(null); setLocating(false); },
+              { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+            );
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        );
+      } else {
+        setLocating(false);
+      }
+    }
+
     // Check if user is registered
     const checkRegistration = async () => {
       const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
@@ -55,7 +79,6 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
         return;
       }
 
-      // Strip non-digit characters for flexible matching
       const phoneDigits = phone.replace(/\D/g, "");
 
       const { data: allNumbers } = await supabase
@@ -78,26 +101,6 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     };
 
     checkRegistration();
-
-    // Get location - try multiple methods
-    setLocating(true);
-    if (navigator.geolocation) {
-      // First try high accuracy
-      navigator.geolocation.getCurrentPosition(
-        (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
-        () => {
-          // Fallback: try without high accuracy
-          navigator.geolocation.getCurrentPosition(
-            (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
-            () => { setLocation(null); setLocating(false); },
-            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
-          );
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-      );
-    } else {
-      setLocating(false);
-    }
   }, [open]);
 
   // Countdown timer
