@@ -1,4 +1,4 @@
-SOS Alerta - Emergency security system with monitoring central (renamed from TeleGuardia)
+TeleGuardia - Emergency security system with monitoring central
 
 ## Design System
 - Theme: Dark by default (no .dark class needed, :root IS dark)
@@ -11,7 +11,15 @@ SOS Alerta - Emergency security system with monitoring central (renamed from Tel
 ## Architecture
 - Roles stored in user_roles table (app_role enum: admin, operator, director_monitoreo, supervisor_central)
 - has_role() security definer function for RLS
-- Tables: alarms, profiles, user_roles, registered_numbers, gps_devices
+- Tables: alarms (realtime enabled), profiles, user_roles, registered_numbers, gps_devices
 - Auth: Supabase Auth with auto-profile creation trigger
-- Edge functions: send-whatsapp, create-user, update-user
-- localStorage key: sosalerta_settings
+- Edge functions: send-whatsapp, create-user, update-user, delete-user
+- Admin user: admin@teleguardia.com / Admin2026*
+
+## Pages
+- / = Emergency buttons (public)
+- /login = Auth login
+- /plataforma = Role-based router
+- /admin = Admin panel (5 tabs: Users, WhatsApp Numbers, GPS, Alarms History, Settings)
+- /operador = Operator dashboard (realtime alarms with process/resolve flow)
+- /configuracion = Settings (legacy, moved to admin)
