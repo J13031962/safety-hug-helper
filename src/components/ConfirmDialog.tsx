@@ -78,13 +78,21 @@ export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProp
 
     checkRegistration();
 
-    // Get location
+    // Get location - try multiple methods
     setLocating(true);
     if (navigator.geolocation) {
+      // First try high accuracy
       navigator.geolocation.getCurrentPosition(
         (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
-        () => { setLocation(null); setLocating(false); },
-        { enableHighAccuracy: true, timeout: 10000 }
+        () => {
+          // Fallback: try without high accuracy
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+            () => { setLocation(null); setLocating(false); },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          );
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     } else {
       setLocating(false);
