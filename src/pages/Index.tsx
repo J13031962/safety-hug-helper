@@ -22,9 +22,24 @@ const Index = () => {
         () => setGpsActive(false)
       );
     }
-    const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
-    setUserName(settings.senderName || "");
-    setPhoneNumber((settings.phoneNumber || "").replace(/\D/g, ""));
+  }, []);
+
+  // Read phone/name from localStorage every time component renders (PhoneGate may update it)
+  useEffect(() => {
+    const readSettings = () => {
+      const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
+      setUserName(settings.senderName || "");
+      setPhoneNumber((settings.phoneNumber || "").replace(/\D/g, ""));
+    };
+    readSettings();
+    // Also listen for storage changes
+    window.addEventListener("storage", readSettings);
+    // Poll once after a short delay in case PhoneGate just wrote
+    const timer = setTimeout(readSettings, 500);
+    return () => {
+      window.removeEventListener("storage", readSettings);
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleSelect = (type: AlarmType) => {
