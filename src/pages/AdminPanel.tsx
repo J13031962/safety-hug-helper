@@ -72,6 +72,9 @@ export default function AdminPanel() {
             <TabsTrigger value="alarms" className="gap-1 text-xs sm:text-sm">
               <Bell className="w-4 h-4" /> <span className="hidden sm:inline">Alarmas</span>
             </TabsTrigger>
+            <TabsTrigger value="reports" className="gap-1 text-xs sm:text-sm">
+              <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Reportes</span>
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-1 text-xs sm:text-sm">
               <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Config</span>
             </TabsTrigger>
