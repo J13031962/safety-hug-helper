@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LogOut, ArrowLeft, Shield, Users, Phone, Radio, Bell, Settings } from "lucide-react";
+import { LogOut, ArrowLeft, Shield, Users, Phone, Radio, Bell, Settings, FileText } from "lucide-react";
 import UsersTab from "@/components/admin/UsersTab";
 import RegisteredNumbersTab from "@/components/admin/RegisteredNumbersTab";
 import GpsDevicesTab from "@/components/admin/GpsDevicesTab";
 import AlarmsHistoryTab from "@/components/admin/AlarmsHistoryTab";
 import SettingsTab from "@/components/admin/SettingsTab";
+import ReportsTab from "@/components/admin/ReportsTab";
 
 export default function AdminPanel() {
   const { user, role, loading, signOut } = useAuth();
@@ -58,7 +59,7 @@ export default function AdminPanel() {
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 py-6">
         <Tabs defaultValue="users">
-          <TabsList className="grid w-full grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-6 mb-6">
             <TabsTrigger value="users" className="gap-1 text-xs sm:text-sm">
               <Users className="w-4 h-4" /> <span className="hidden sm:inline">Usuarios</span>
             </TabsTrigger>
@@ -71,6 +72,9 @@ export default function AdminPanel() {
             <TabsTrigger value="alarms" className="gap-1 text-xs sm:text-sm">
               <Bell className="w-4 h-4" /> <span className="hidden sm:inline">Alarmas</span>
             </TabsTrigger>
+            <TabsTrigger value="reports" className="gap-1 text-xs sm:text-sm">
+              <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Reportes</span>
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-1 text-xs sm:text-sm">
               <Settings className="w-4 h-4" /> <span className="hidden sm:inline">Config</span>
             </TabsTrigger>
@@ -80,6 +84,7 @@ export default function AdminPanel() {
           <TabsContent value="numbers"><RegisteredNumbersTab /></TabsContent>
           <TabsContent value="gps"><GpsDevicesTab /></TabsContent>
           <TabsContent value="alarms"><AlarmsHistoryTab /></TabsContent>
+          <TabsContent value="reports"><ReportsTab /></TabsContent>
           <TabsContent value="settings"><SettingsTab /></TabsContent>
         </Tabs>
       </main>
