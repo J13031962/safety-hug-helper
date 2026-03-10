@@ -22,6 +22,7 @@ interface ConfirmDialogProps {
   open: boolean;
   type: AlarmType | null;
   onClose: () => void;
+  initialLocation?: { lat: number; lng: number } | null;
 }
 
 type DialogState = "confirm" | "sending" | "success" | "not_registered";
