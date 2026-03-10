@@ -250,7 +250,7 @@ export default function OperatorDashboard() {
                           <div><span className="text-muted-foreground">Procesado:</span> {alarm.processed_at ? new Date(alarm.processed_at).toLocaleString("es-VE") : "—"}</div>
                         </div>
                       )}
-                      <p className="text-xs text-muted-foreground mt-1">{new Date(alarm.created_at).toLocaleString("es-VE")}</p>
+                      {alarm.status !== "resolved" && <p className="text-xs text-muted-foreground mt-1">{new Date(alarm.created_at).toLocaleString("es-VE")}</p>}
                     </div>
                     <div className="flex flex-col gap-2">
                       {isPending && (
