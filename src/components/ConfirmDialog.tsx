@@ -54,13 +54,21 @@ export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProp
         return;
       }
 
-      const { data } = await supabase
-        .from("registered_numbers")
-        .select("id")
-        .eq("phone_number", phone)
-        .maybeSingle();
+      // Strip non-digit characters for flexible matching
+      const phoneDigits = phone.replace(/\D/g, "");
 
-      if (!data) {
+      const { data: allNumbers } = await supabase
+        .from("registered_numbers")
+        .select("id, phone_number");
+
+      const match = allNumbers?.find((r) => {
+        const registeredDigits = r.phone_number.replace(/\D/g, "");
+        return registeredDigits === phoneDigits || 
+               registeredDigits.endsWith(phoneDigits) || 
+               phoneDigits.endsWith(registeredDigits);
+      });
+
+      if (!match) {
         setState("not_registered");
         return;
       }
