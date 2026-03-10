@@ -101,9 +101,13 @@ export default function OperatorDashboard() {
 
   if (!user || !role) return null;
 
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
   const pendingAlarms = alarms.filter((a) => a.status === "pending");
   const processingAlarms = alarms.filter((a) => a.status === "processing");
   const resolvedAlarms = alarms.filter((a) => a.status === "resolved");
+
+  const filteredAlarms = statusFilter ? alarms.filter((a) => a.status === statusFilter) : alarms;
 
   const roleLabel = role === "director_monitoreo" ? "Director Central" : role === "operator" ? "Operador" : role === "supervisor_central" ? "Supervisor" : "Admin";
 
