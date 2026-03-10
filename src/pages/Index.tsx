@@ -13,9 +13,9 @@ const IndexContent = () => {
   const [selectedType, setSelectedType] = useState<AlarmType | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [gpsActive, setGpsActive] = useState(false);
+  const locationRef = useRef<{ lat: number; lng: number } | null>(null);
   const navigate = useNavigate();
 
-  // Read settings directly (not in useEffect) so it's always fresh
   const settings = useMemo(() => {
     return JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
   }, []);
@@ -24,13 +24,20 @@ const IndexContent = () => {
   const phoneDigits = (settings.phoneNumber || "").replace(/\D/g, "");
   const isAdmin = phoneDigits.endsWith(ADMIN_PHONE);
 
+  // Continuously track GPS position
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        () => setGpsActive(true),
-        () => setGpsActive(false)
-      );
-    }
+    if (!navigator.geolocation) return;
+    
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        locationRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setGpsActive(true);
+      },
+      () => setGpsActive(false),
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   const handleSelect = (type: AlarmType) => {
