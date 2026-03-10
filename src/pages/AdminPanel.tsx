@@ -84,6 +84,7 @@ export default function AdminPanel() {
           <TabsContent value="numbers"><RegisteredNumbersTab /></TabsContent>
           <TabsContent value="gps"><GpsDevicesTab /></TabsContent>
           <TabsContent value="alarms"><AlarmsHistoryTab /></TabsContent>
+          <TabsContent value="reports"><ReportsTab /></TabsContent>
           <TabsContent value="settings"><SettingsTab /></TabsContent>
         </Tabs>
       </main>
