@@ -16,28 +16,28 @@ const buttons: EmergencyButton[] = [
     type: "panic",
     label: "PÁNICO",
     subtitle: "Alerta inmediata",
-    icon: <ShieldAlert className="w-10 h-10" />,
+    icon: <ShieldAlert className="w-8 h-8" />,
     bgClass: "bg-emergency-panic",
   },
   {
     type: "medical",
     label: "MÉDICA",
     subtitle: "Emergencia médica",
-    icon: <Heart className="w-10 h-10" />,
+    icon: <Heart className="w-8 h-8" />,
     bgClass: "bg-emergency-medical",
   },
   {
     type: "fire",
     label: "INCENDIO",
     subtitle: "Emergencia fuego",
-    icon: <Flame className="w-10 h-10" />,
+    icon: <Flame className="w-8 h-8" />,
     bgClass: "bg-emergency-fire",
   },
   {
     type: "disaster",
     label: "DESASTRE",
     subtitle: "Desastre natural",
-    icon: <AlertTriangle className="w-10 h-10" />,
+    icon: <AlertTriangle className="w-8 h-8" />,
     bgClass: "bg-emergency-disaster",
   },
 ];
@@ -57,13 +57,13 @@ export default function EmergencyGrid({ onSelect }: EmergencyGridProps) {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-4 w-full max-w-sm mx-auto">
+    <div className="grid grid-cols-2 gap-3 w-full max-w-[280px] mx-auto">
       {buttons.map((btn) => (
         <button
           key={btn.type}
           onClick={() => handlePress(btn.type)}
           className={`
-            relative flex flex-col items-center justify-center gap-2 p-5 rounded-2xl
+            relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl
             transition-all duration-200 cursor-pointer select-none
             ${btn.bgClass} text-foreground
             ${pressed === btn.type ? "animate-shake scale-95" : "hover:scale-[1.03] hover:brightness-110"}
