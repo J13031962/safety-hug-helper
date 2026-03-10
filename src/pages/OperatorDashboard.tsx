@@ -256,7 +256,7 @@ export default function OperatorDashboard() {
                             size="sm"
                             className="bg-green-600 hover:bg-green-700 text-foreground"
                             onClick={() => handleProcess(alarm, "resolved")}
-                            disabled={processing}
+                            disabled={processing || (selectedAlarm?.id === alarm.id ? !observations.trim() : true)}
                           >
                             <CheckCircle className="w-3 h-3 mr-1" /> Resolver
                           </Button>
