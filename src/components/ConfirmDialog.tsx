@@ -153,6 +153,11 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     }
 
     setState("success");
+
+    // Auto-close after 4 seconds
+    setTimeout(() => {
+      onClose();
+    }, 4000);
   }, [type, state, location]);
 
   const handleClose = () => {
