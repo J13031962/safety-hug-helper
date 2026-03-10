@@ -57,13 +57,13 @@ export default function EmergencyGrid({ onSelect }: EmergencyGridProps) {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-4 w-full max-w-sm mx-auto">
+    <div className="grid grid-cols-2 gap-3 w-full max-w-[280px] mx-auto">
       {buttons.map((btn) => (
         <button
           key={btn.type}
           onClick={() => handlePress(btn.type)}
           className={`
-            relative flex flex-col items-center justify-center gap-2 p-5 rounded-2xl
+            relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl
             transition-all duration-200 cursor-pointer select-none
             ${btn.bgClass} text-foreground
             ${pressed === btn.type ? "animate-shake scale-95" : "hover:scale-[1.03] hover:brightness-110"}
