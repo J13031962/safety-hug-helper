@@ -12,6 +12,7 @@ const Index = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [gpsActive, setGpsActive] = useState(false);
   const [userName, setUserName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +24,7 @@ const Index = () => {
     }
     const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
     setUserName(settings.senderName || "");
+    setPhoneNumber((settings.phoneNumber || "").replace(/\D/g, ""));
   }, []);
 
   const handleSelect = (type: AlarmType) => {
