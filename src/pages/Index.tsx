@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Activity, MapPin } from "lucide-react";
+import { Activity, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import EmergencyGrid from "@/components/EmergencyGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
