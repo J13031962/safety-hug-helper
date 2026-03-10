@@ -6,27 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield, UserPlus, LogIn } from "lucide-react";
+import { Shield, LogIn, ArrowLeft } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "setup">("login");
   const [checking, setChecking] = useState(true);
   const [hasAdmin, setHasAdmin] = useState(true);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Redirect if already logged in
   useEffect(() => {
     if (!loading && user) navigate("/plataforma");
   }, [loading, user, navigate]);
 
-  // Check if any admin exists
   useEffect(() => {
     async function check() {
       const { count } = await supabase
@@ -49,41 +45,6 @@ export default function LoginPage() {
     setSubmitting(false);
   };
 
-  const handleSetupAdmin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-
-    // Sign up the first admin
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName }, emailRedirectTo: window.location.origin },
-    });
-
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-      setSubmitting(false);
-      return;
-    }
-
-    // Assign admin role - need to use service role via edge function or directly if first user
-    if (data.user) {
-      const { error: roleError } = await supabase.from("user_roles").insert({
-        user_id: data.user.id,
-        role: "admin" as const,
-      });
-
-      if (roleError) {
-        // First admin may need special handling - try RPC
-        toast({ title: "Aviso", description: "Cuenta creada. El rol de admin se asignará automáticamente.", variant: "default" });
-      } else {
-        toast({ title: "¡Éxito!", description: "Primer administrador configurado correctamente" });
-      }
-    }
-
-    setSubmitting(false);
-  };
-
   if (loading || checking) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -93,71 +54,75 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md border-border">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-2">
-            <Shield className="w-12 h-12 text-emergency-panic" />
-          </div>
-          <CardTitle className="text-2xl font-display">SOS Alerta</CardTitle>
-          <CardDescription>
-            {!hasAdmin
-              ? "No hay administradores. Configura el primer admin."
-              : "Inicia sesión para acceder a la central"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!hasAdmin && mode === "login" && (
-            <div className="mb-4 p-3 rounded-lg bg-emergency-disaster/10 border border-emergency-disaster/30 text-sm text-emergency-disaster">
-              <UserPlus className="inline w-4 h-4 mr-1" />
-              No hay administradores registrados.{" "}
-              <button onClick={() => setMode("setup")} className="underline font-medium">
-                Configurar primer admin
-              </button>
-            </div>
-          )}
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Top bar */}
+      <div className="px-4 py-3">
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Alarmas
+        </button>
+      </div>
 
-          {mode === "setup" ? (
-            <form onSubmit={handleSetupAdmin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Nombre completo</Label>
-                <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+      {/* Centered content */}
+      <div className="flex-1 flex items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="flex justify-center mb-3">
+              <div className="w-14 h-14 rounded-xl bg-emergency-panic/10 border border-emergency-panic/30 flex items-center justify-center">
+                <Shield className="w-7 h-7 text-emergency-panic" />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo electrónico</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
-              </div>
-              <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? "Configurando..." : "Configurar Administrador"}
-              </Button>
-              {hasAdmin && (
-                <Button type="button" variant="ghost" className="w-full" onClick={() => setMode("login")}>
-                  Volver al inicio de sesión
+            </div>
+            <h1 className="text-2xl font-display font-bold">Central de Monitoreo</h1>
+            <p className="text-sm text-muted-foreground mt-1">Ingresa tus credenciales para acceder</p>
+          </div>
+
+          {/* Login card */}
+          <Card className="border-border">
+            <CardContent className="pt-6">
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-semibold">Correo electrónico</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="admin@empresa.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-semibold">Contraseña</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full bg-emergency-panic hover:bg-emergency-panic/90 text-white font-semibold"
+                  disabled={submitting}
+                >
+                  <LogIn className="w-4 h-4 mr-2" />
+                  {submitting ? "Ingresando..." : "Ingresar"}
                 </Button>
-              )}
-            </form>
-          ) : (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo electrónico</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-              </div>
-              <Button type="submit" className="w-full" disabled={submitting}>
-                <LogIn className="w-4 h-4 mr-2" />
-                {submitting ? "Iniciando..." : "Iniciar sesión"}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+              </form>
+            </CardContent>
+          </Card>
+
+          <p className="text-center text-xs text-muted-foreground mt-4">
+            Contacta al administrador para obtener acceso
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
