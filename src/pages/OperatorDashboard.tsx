@@ -265,8 +265,6 @@ export default function OperatorDashboard() {
                           )}
                         </div>
                       </div>
-                        </a>
-                      )}
                       {alarm.observations && (
                         <p className="text-xs text-muted-foreground mt-2 italic">Obs: {alarm.observations}</p>
                       )}
