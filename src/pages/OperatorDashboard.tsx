@@ -64,14 +64,34 @@ export default function OperatorDashboard() {
       .on("postgres_changes", { event: "*", schema: "public", table: "alarms" }, (payload) => {
         if (payload.eventType === "INSERT") {
           setAlarms((prev) => [payload.new as Alarm, ...prev]);
-          // Audio beep for new alarm
+          // Speak alarm type
+          const newAlarm = payload.new as Alarm;
+          const voiceLabels: Record<string, string> = {
+            panic: "¡Alerta de pánico!",
+            medical: "¡Alerta médica!",
+            fire: "¡Alerta de incendio!",
+            disaster: "¡Alerta de desastre!",
+          };
           try {
+            // Beep first
             const ctx = new AudioContext();
             const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
             osc.frequency.value = 880;
-            osc.connect(ctx.destination);
+            gain.gain.value = 0.5;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
             osc.start();
-            setTimeout(() => { osc.stop(); ctx.close(); }, 300);
+            setTimeout(() => {
+              osc.stop();
+              ctx.close();
+              // Then speak
+              const msg = new SpeechSynthesisUtterance(voiceLabels[newAlarm.alarm_type] || "¡Nueva alerta!");
+              msg.lang = "es-ES";
+              msg.rate = 0.9;
+              msg.volume = 1;
+              speechSynthesis.speak(msg);
+            }, 400);
           } catch {}
         } else if (payload.eventType === "UPDATE") {
           setAlarms((prev) => prev.map((a) => (a.id === (payload.new as Alarm).id ? (payload.new as Alarm) : a)));
