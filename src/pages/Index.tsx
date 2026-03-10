@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Activity, MapPin } from "lucide-react";
+import { Activity, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import EmergencyGrid from "@/components/EmergencyGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -42,9 +42,6 @@ const Index = () => {
             </div>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => navigate("/configuracion")} className="text-muted-foreground hover:text-foreground transition-colors">
-              <Settings className="w-5 h-5" />
-            </button>
             <button onClick={() => navigate("/plataforma")} className="text-muted-foreground hover:text-foreground transition-colors">
               <Activity className="w-5 h-5" />
             </button>
