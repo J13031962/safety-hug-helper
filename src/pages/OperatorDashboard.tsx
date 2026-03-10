@@ -27,12 +27,24 @@ export default function OperatorDashboard() {
   const [observations, setObservations] = useState("");
   const [processing, setProcessing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [operatorMap, setOperatorMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
       navigate("/login");
     }
   }, [loading, user, role, navigate]);
+
+  // Fetch operator profiles
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      const { data } = await supabase.from("profiles").select("user_id, full_name, email");
+      const map: Record<string, string> = {};
+      (data || []).forEach((p) => { map[p.user_id] = p.full_name || p.email || "—"; });
+      setOperatorMap(map);
+    };
+    fetchProfiles();
+  }, []);
 
   // Fetch alarms
   useEffect(() => {
@@ -230,6 +242,13 @@ export default function OperatorDashboard() {
                       )}
                       {alarm.observations && (
                         <p className="text-xs text-muted-foreground mt-2 italic">Obs: {alarm.observations}</p>
+                      )}
+                      {alarm.status === "resolved" && (
+                        <div className="mt-2 space-y-0.5 text-xs border-t border-border pt-2">
+                          <div><span className="text-muted-foreground">Operador:</span> <span className="text-green-400 font-medium">{alarm.processed_by ? (operatorMap[alarm.processed_by] || "—") : "—"}</span></div>
+                          <div><span className="text-muted-foreground">Recibido:</span> {new Date(alarm.created_at).toLocaleString("es-VE")}</div>
+                          <div><span className="text-muted-foreground">Procesado:</span> {alarm.processed_at ? new Date(alarm.processed_at).toLocaleString("es-VE") : "—"}</div>
+                        </div>
                       )}
                       <p className="text-xs text-muted-foreground mt-1">{new Date(alarm.created_at).toLocaleString("es-VE")}</p>
                     </div>
