@@ -163,15 +163,20 @@ export default function ConfirmDialog({ open, type, onClose }: ConfirmDialogProp
             </div>
             <h2 className="text-xl font-display font-bold">No Registrado</h2>
             <p className="text-sm text-muted-foreground text-center">
-              Su número no se encuentra registrado en el sistema. Comuníquese con la empresa para gestionar los permisos de acceso.
+              Su número no se encuentra registrado en el sistema. Asegúrese de configurar su número de teléfono en Configuración.
             </p>
             <div className="w-full rounded-lg border border-emergency-disaster/40 bg-emergency-disaster/10 p-3 text-xs text-emergency-disaster flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>Contacte al administrador para registrar su número y poder enviar alertas de emergencia.</span>
+              <span>Vaya a Configuración, ingrese su número de teléfono registrado y guarde. Si su número no está registrado, contacte al administrador.</span>
             </div>
-            <Button variant="outline" onClick={handleClose} className="mt-2 w-full">
-              Cerrar
-            </Button>
+            <div className="flex gap-3 w-full">
+              <Button variant="outline" onClick={handleClose} className="flex-1">
+                Cerrar
+              </Button>
+              <Button onClick={() => { handleClose(); navigate("/configuracion"); }} className="flex-1 bg-emergency-medical hover:bg-emergency-medical/80 text-foreground font-bold">
+                Ir a Configuración
+              </Button>
+            </div>
           </div>
 
         ) : state === "success" ? (
