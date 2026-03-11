@@ -19,6 +19,30 @@ export default function RegisteredNumbersTab() {
   const [editing, setEditing] = useState<RegisteredNumber | null>(null);
   const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_name: "", callmebot_apikey: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [parcelSuggestions, setParcelSuggestions] = useState<string[]>([]);
+  const [showParcelSuggestions, setShowParcelSuggestions] = useState(false);
+  const parcelRef = useRef<HTMLDivElement>(null);
+
+  const uniqueParcels = useMemo(() => {
+    const parcels = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
+    return [...new Set(parcels)].sort();
+  }, [numbers]);
+
+  const filteredParcels = useMemo(() => {
+    if (!form.parcel_name) return uniqueParcels;
+    return uniqueParcels.filter((p) => p.toLowerCase().includes(form.parcel_name.toLowerCase()));
+  }, [form.parcel_name, uniqueParcels]);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (parcelRef.current && !parcelRef.current.contains(e.target as Node)) {
+        setShowParcelSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const fetch = async () => {
     setLoading(true);
