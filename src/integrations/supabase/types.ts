@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       alarms: {
         Row: {
+          address: string | null
           alarm_type: string
           created_at: string
           house_number: string | null
@@ -31,6 +32,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          address?: string | null
           alarm_type: string
           created_at?: string
           house_number?: string | null
@@ -46,6 +48,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          address?: string | null
           alarm_type?: string
           created_at?: string
           house_number?: string | null

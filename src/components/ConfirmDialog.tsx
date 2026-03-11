@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle2, MapPin, Loader2, ShieldX } from "lucide-react";
+import { reverseGeocode } from "@/lib/geocode";
 
 type AlarmType = "panic" | "medical" | "fire" | "disaster";
 
@@ -32,6 +33,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
   const [countdown, setCountdown] = useState(5);
   const [state, setState] = useState<DialogState>("confirm");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [whatsappWarning, setWhatsappWarning] = useState<string | null>(null);
 
@@ -41,23 +43,36 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       setState("confirm");
       setCountdown(5);
       setLocation(null);
+      setAddress(null);
       setWhatsappWarning(null);
       return;
     }
+
+    const resolveAddress = async (lat: number, lng: number) => {
+      const geo = await reverseGeocode(lat, lng);
+      setAddress(geo.full);
+    };
 
     // Use initialLocation if available
     if (initialLocation) {
       setLocation(initialLocation);
       setLocating(false);
+      resolveAddress(initialLocation.lat, initialLocation.lng);
     } else {
       // Try to get location
       setLocating(true);
       if (navigator.geolocation) {
+        const onSuccess = (pos: GeolocationPosition) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setLocation(loc);
+          setLocating(false);
+          resolveAddress(loc.lat, loc.lng);
+        };
         navigator.geolocation.getCurrentPosition(
-          (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+          onSuccess,
           () => {
             navigator.geolocation.getCurrentPosition(
-              (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+              onSuccess,
               () => { setLocation(null); setLocating(false); },
               { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
             );
@@ -132,6 +147,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       parcel_name: settings.parcelName || "",
       latitude: location?.lat ?? null,
       longitude: location?.lng ?? null,
+      address: address || null,
     };
 
     const { error } = await supabase.from("alarms").insert(alarmData);
@@ -260,8 +276,8 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
               ) : location ? (
                 <>
                   <MapPin className="w-4 h-4 text-emergency-panic" />
-                  <span className="text-muted-foreground">
-                    📍 {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
+                  <span className="text-muted-foreground text-xs">
+                    📍 {address || `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`}
                   </span>
                 </>
               ) : (

@@ -54,6 +54,7 @@ export default function AlarmsHistoryTab() {
               <TableRow>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Remitente</TableHead>
+                <TableHead>Dirección</TableHead>
                 <TableHead>Casa</TableHead>
                 <TableHead>Parcela</TableHead>
                 <TableHead>Estado</TableHead>
@@ -69,6 +70,9 @@ export default function AlarmsHistoryTab() {
                       <Badge className={`${typeInfo.color} text-foreground border-0`}>{typeInfo.label}</Badge>
                     </TableCell>
                     <TableCell>{a.sender_name || "—"}</TableCell>
+                    <TableCell className="text-xs max-w-[200px] truncate" title={(a as any).address || ""}>
+                      {(a as any).address || (a.latitude && a.longitude ? `${a.latitude.toFixed(4)}, ${a.longitude.toFixed(4)}` : "—")}
+                    </TableCell>
                     <TableCell>{a.house_number || "—"}</TableCell>
                     <TableCell>{a.parcel_name || "—"}</TableCell>
                     <TableCell>
@@ -83,7 +87,7 @@ export default function AlarmsHistoryTab() {
                 );
               })}
               {alarms.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay alarmas</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay alarmas</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
