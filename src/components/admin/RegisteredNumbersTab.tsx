@@ -12,8 +12,15 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type RegisteredNumber = Tables<"registered_numbers">;
 
+interface Parcel {
+  id: string;
+  name: string;
+  whatsapp_group_id: string | null;
+}
+
 export default function RegisteredNumbersTab() {
   const [numbers, setNumbers] = useState<RegisteredNumber[]>([]);
+  const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<RegisteredNumber | null>(null);
@@ -29,9 +36,10 @@ export default function RegisteredNumbersTab() {
   const [renaming, setRenaming] = useState(false);
 
   const uniqueParcels = useMemo(() => {
-    const parcels = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
-    return [...new Set(parcels)].sort();
-  }, [numbers]);
+    const fromNumbers = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
+    const fromParcelsTable = parcels.map((p) => p.name);
+    return [...new Set([...fromNumbers, ...fromParcelsTable])].sort();
+  }, [numbers, parcels]);
 
   const filteredParcels = useMemo(() => {
     if (!form.parcel_name) return uniqueParcels;
