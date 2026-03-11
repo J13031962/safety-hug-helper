@@ -88,6 +88,7 @@ export default function GpsDevicesTab() {
                 <TableHead>IMEI</TableHead>
                 <TableHead>SIM</TableHead>
                 <TableHead>Modelo</TableHead>
+                <TableHead>Duración Relay</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
             </TableHeader>
