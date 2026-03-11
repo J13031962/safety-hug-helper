@@ -244,6 +244,7 @@ export default function OperatorDashboard() {
                         <span className={`text-xs font-medium ${isPending ? "text-emergency-panic" : isProcessing ? "text-emergency-medical" : "text-green-400"}`}>
                           {isPending ? "PENDIENTE" : isProcessing ? "EN PROCESO" : "RESUELTA"}
                         </span>
+                        <AlarmTimer createdAt={alarm.created_at} processedAt={alarm.processed_at} status={alarm.status} />
                       </div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                         <div><span className="text-muted-foreground">Remitente:</span> {alarm.sender_name || "—"}</div>
