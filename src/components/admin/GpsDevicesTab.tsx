@@ -72,11 +72,24 @@ export default function GpsDevicesTab() {
 
   return (
     <Card className="border-border">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="flex items-center gap-2 font-display text-lg">
-          <Radio className="w-5 h-5" /> Dispositivos GPS
-        </CardTitle>
-        <Button size="sm" onClick={openCreate}><Plus className="w-4 h-4 mr-1" /> Nuevo</Button>
+      <CardHeader className="pb-4 space-y-3">
+        <div className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2 font-display text-lg">
+            <Radio className="w-5 h-5" /> Dispositivos GPS
+          </CardTitle>
+          <Button size="sm" onClick={openCreate}><Plus className="w-4 h-4 mr-1" /> Nuevo</Button>
+        </div>
+        <div className="flex flex-wrap gap-4 p-3 rounded-md bg-muted/50 border border-border text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Servidor:</span>
+            <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">192.99.16.163</code>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Puerto:</span>
+            <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">3000</code>
+          </div>
+          <p className="w-full text-xs text-muted-foreground">Configura esta IP y puerto en cada dispositivo GPS para que se conecte al servidor.</p>
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
