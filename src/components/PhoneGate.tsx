@@ -51,7 +51,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
         .from("registered_numbers")
         .select("phone_number, owner_name, house_number, parcel_name");
 
-      const match = allNumbers?.find((r) => {
+    const match = allNumbers?.find((r) => {
         const rd = normalizeDigits(r.phone_number);
         return rd === digits || rd.endsWith(digits) || digits.endsWith(rd);
       }) as RegisteredUser | undefined;
