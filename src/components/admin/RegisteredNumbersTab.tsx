@@ -171,26 +171,41 @@ export default function RegisteredNumbersTab() {
                 <TableHead>Teléfono</TableHead>
                 <TableHead>Casa</TableHead>
                 <TableHead>Parcela</TableHead>
+                <TableHead>Grupo WA</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {numbers.map((n) => (
-                <TableRow key={n.id}>
-                  <TableCell className="font-medium">{n.owner_name}</TableCell>
-                  <TableCell>{n.phone_number}</TableCell>
-                  <TableCell>{n.house_number || "—"}</TableCell>
-                  <TableCell>{n.parcel_name || "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(n)}><Pencil className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(n)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {numbers.map((n) => {
+                const linkedParcel = parcels.find((p) => p.name === n.parcel_name);
+                return (
+                  <TableRow key={n.id}>
+                    <TableCell className="font-medium">{n.owner_name}</TableCell>
+                    <TableCell>{n.phone_number}</TableCell>
+                    <TableCell>{n.house_number || "—"}</TableCell>
+                    <TableCell>{n.parcel_name || "—"}</TableCell>
+                    <TableCell>
+                      {linkedParcel?.whatsapp_group_id ? (
+                        <span className="text-xs font-mono text-primary truncate max-w-[120px] inline-block" title={linkedParcel.whatsapp_group_id}>
+                          ✅ {linkedParcel.whatsapp_group_id.substring(0, 12)}…
+                        </span>
+                      ) : n.parcel_name ? (
+                        <span className="text-xs text-muted-foreground italic">Sin grupo</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(n)}><Pencil className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(n)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {numbers.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No hay números registrados</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay números registrados</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
