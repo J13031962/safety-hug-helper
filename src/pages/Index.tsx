@@ -96,8 +96,8 @@ const IndexContent = () => {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-4">
-        <div className="w-32 h-32">
-          <img src={smartsosLogo} alt="SmartSOS Logo" className="w-full h-full object-contain" />
+        <div className="w-full max-w-xs px-4">
+          <img src={smartsosLogo} alt="SmartSOS Logo" className="w-full h-auto object-contain" />
         </div>
         <p className="text-muted-foreground text-sm">Presiona un botón para enviar alerta de emergencia</p>
         <EmergencyGrid onSelect={handleSelect} />
