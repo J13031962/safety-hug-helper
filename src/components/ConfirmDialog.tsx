@@ -276,8 +276,8 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
               ) : location ? (
                 <>
                   <MapPin className="w-4 h-4 text-emergency-panic" />
-                  <span className="text-muted-foreground">
-                    📍 {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
+                  <span className="text-muted-foreground text-xs">
+                    📍 {address || `${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}`}
                   </span>
                 </>
               ) : (
