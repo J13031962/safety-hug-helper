@@ -70,6 +70,9 @@ export default function AlarmsHistoryTab() {
                       <Badge className={`${typeInfo.color} text-foreground border-0`}>{typeInfo.label}</Badge>
                     </TableCell>
                     <TableCell>{a.sender_name || "—"}</TableCell>
+                    <TableCell className="text-xs max-w-[200px] truncate" title={(a as any).address || ""}>
+                      {(a as any).address || (a.latitude && a.longitude ? `${a.latitude.toFixed(4)}, ${a.longitude.toFixed(4)}` : "—")}
+                    </TableCell>
                     <TableCell>{a.house_number || "—"}</TableCell>
                     <TableCell>{a.parcel_name || "—"}</TableCell>
                     <TableCell>
