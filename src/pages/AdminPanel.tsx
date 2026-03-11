@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LogOut, ArrowLeft, Shield, Users, Phone, Radio, Bell, Settings, FileText } from "lucide-react";
+import { LogOut, ArrowLeft, Shield, Users, Phone, Radio, Bell, Settings, FileText, MapPin } from "lucide-react";
 import UsersTab from "@/components/admin/UsersTab";
 import RegisteredNumbersTab from "@/components/admin/RegisteredNumbersTab";
 import GpsDevicesTab from "@/components/admin/GpsDevicesTab";
