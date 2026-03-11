@@ -81,17 +81,31 @@ Deno.serve(async (req) => {
       return phone.startsWith("+") ? phone : `+${digits}`;
     };
 
-    // Send to all contacts via TextMeBot in parallel
-    const results = await Promise.allSettled(
-      contacts.map(async (contact) => {
+    // Send to all contacts via TextMeBot sequentially (API may rate-limit parallel calls)
+    const results = [];
+    for (const contact of contacts) {
+      try {
         const recipient = normalize(contact.phone_number);
-        const url = `https://api.textmebot.com/send.php?recipient=${encodeURIComponent(recipient)}&apikey=${encodeURIComponent(TEXTMEBOT_API_KEY)}&text=${encoded}`;
-        const res = await fetch(url);
+        const formData = new URLSearchParams();
+        formData.append("recipient", recipient);
+        formData.append("apikey", TEXTMEBOT_API_KEY);
+        formData.append("text", msg);
+
+        const res = await fetch("https://api.textmebot.com/send.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formData.toString(),
+        });
         const text = await res.text();
-        console.log(`TextMeBot -> ${contact.phone_number}: ${res.status} ${text.substring(0, 100)}`);
-        return { phone: contact.phone_number, status: res.status };
-      })
-    );
+        console.log(`TextMeBot -> ${recipient}: ${res.status} ${text.substring(0, 200)}`);
+        results.push({ status: "fulfilled", phone: recipient, httpStatus: res.status });
+      } catch (err) {
+        console.error(`TextMeBot -> ${contact.phone_number}: FAILED`, err.message);
+        results.push({ status: "rejected", phone: contact.phone_number });
+      }
+      // Small delay between sends to avoid rate limiting
+      await new Promise((r) => setTimeout(r, 1500));
+    }
 
     const sent = results.filter((r) => r.status === "fulfilled").length;
     const failed = results.filter((r) => r.status === "rejected").length;
