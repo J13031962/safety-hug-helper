@@ -47,7 +47,7 @@ export default function GpsDevicesTab() {
       return;
     }
     setSubmitting(true);
-    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null };
+    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30 };
 
     if (editing) {
       const { error } = await supabase.from("gps_devices").update(payload).eq("id", editing.id);
