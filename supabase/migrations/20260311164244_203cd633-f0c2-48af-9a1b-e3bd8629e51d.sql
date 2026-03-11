@@ -1,0 +1,1 @@
+ALTER TABLE public.alarms ADD COLUMN address text;
