@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import EmergencyGrid from "@/components/EmergencyGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PhoneGate from "@/components/PhoneGate";
+import smartsosLogo from "@/assets/smartsos-logo.png";
 
 type AlarmType = "panic" | "medical" | "fire" | "disaster";
 
@@ -24,20 +25,36 @@ const IndexContent = () => {
   const phoneDigits = (settings.phoneNumber || "").replace(/\D/g, "");
   const isAdmin = phoneDigits.endsWith(ADMIN_PHONE);
 
-  // Continuously track GPS position
+  // Continuously track GPS position - try high accuracy first, fallback to low accuracy
   useEffect(() => {
     if (!navigator.geolocation) return;
-    
-    const watchId = navigator.geolocation.watchPosition(
+
+    let watchId: number | undefined;
+
+    // Try high accuracy first
+    watchId = navigator.geolocation.watchPosition(
       (pos) => {
         locationRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setGpsActive(true);
       },
-      () => setGpsActive(false),
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+      () => {
+        // If high accuracy fails, fallback to low accuracy
+        if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+        watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            locationRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setGpsActive(true);
+          },
+          () => setGpsActive(false),
+          { enableHighAccuracy: false, maximumAge: 60000, timeout: 30000 }
+        );
+      },
+      { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+    };
   }, []);
 
   const handleSelect = (type: AlarmType) => {
@@ -78,7 +95,10 @@ const IndexContent = () => {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8 gap-6">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-4">
+        <div className="w-32 h-32">
+          <img src={smartsosLogo} alt="SmartSOS Logo" className="w-full h-full object-contain" />
+        </div>
         <p className="text-muted-foreground text-sm">Presiona un botón para enviar alerta de emergencia</p>
         <EmergencyGrid onSelect={handleSelect} />
       </main>
@@ -96,7 +116,6 @@ const IndexContent = () => {
     </div>
   );
 };
-
 const Index = () => (
   <PhoneGate>
     <IndexContent />
