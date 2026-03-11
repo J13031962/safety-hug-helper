@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
       const { invite_code } = body;
       if (!invite_code) throw new Error("invite_code is required");
 
-      const url = `https://api.textmebot.com/group_info.php?apikey=${encodeURIComponent(TEXTMEBOT_API_KEY)}&invite_code=${encodeURIComponent(invite_code)}`;
+      const url = `https://api.textmebot.com/send.php?apikey=${encodeURIComponent(TEXTMEBOT_API_KEY)}&group_info=${encodeURIComponent(invite_code)}&json=yes`;
       console.log("Fetching group info for invite code:", invite_code);
       const res = await fetch(url);
       const text = await res.text();
