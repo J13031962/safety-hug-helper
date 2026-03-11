@@ -10,6 +10,7 @@ import GpsDevicesTab from "@/components/admin/GpsDevicesTab";
 import AlarmsHistoryTab from "@/components/admin/AlarmsHistoryTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import ReportsTab from "@/components/admin/ReportsTab";
+import ParcelsTab from "@/components/admin/ParcelsTab";
 
 export default function AdminPanel() {
   const { user, role, loading, signOut } = useAuth();
