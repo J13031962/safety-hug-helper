@@ -226,6 +226,39 @@ export default function RegisteredNumbersTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rename parcel dialog */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="sm:max-w-md border-border">
+          <DialogHeader><DialogTitle className="font-display">Renombrar parcela</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Selecciona una parcela existente y escribe el nuevo nombre. Se actualizarán todos los registros que la tengan.</p>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Parcela actual</Label>
+              <select
+                value={renameFrom}
+                onChange={(e) => setRenameFrom(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Seleccionar parcela...</option>
+                {uniqueParcels.map((p) => (
+                  <option key={p} value={p}>{p} ({numbers.filter((n) => n.parcel_name === p).length} registros)</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Nuevo nombre</Label>
+              <Input value={renameTo} onChange={(e) => setRenameTo(e.target.value)} placeholder="Nuevo nombre de parcela" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameOpen(false)}>Cancelar</Button>
+            <Button onClick={handleRenameParcel} disabled={renaming || !renameFrom || !renameTo.trim()}>
+              {renaming ? "Renombrando..." : "Renombrar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
