@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
       const { data: parcel } = await supabase
         .from("parcels")
         .select("whatsapp_group_id")
-        .eq("name", parcel_name)
+        .ilike("name", parcel_name)
         .maybeSingle();
 
       if (parcel?.whatsapp_group_id) {
