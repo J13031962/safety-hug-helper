@@ -19,9 +19,14 @@ export default function RegisteredNumbersTab() {
   const [editing, setEditing] = useState<RegisteredNumber | null>(null);
   const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_name: "", callmebot_apikey: "" });
   const [submitting, setSubmitting] = useState(false);
-  const [parcelSuggestions, setParcelSuggestions] = useState<string[]>([]);
   const [showParcelSuggestions, setShowParcelSuggestions] = useState(false);
   const parcelRef = useRef<HTMLDivElement>(null);
+
+  // Rename parcel dialog
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameFrom, setRenameFrom] = useState("");
+  const [renameTo, setRenameTo] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   const uniqueParcels = useMemo(() => {
     const parcels = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
@@ -110,13 +115,40 @@ export default function RegisteredNumbersTab() {
     else { toast({ title: "Eliminado" }); fetch(); }
   };
 
+  const handleRenameParcel = async () => {
+    if (!renameFrom || !renameTo.trim()) {
+      toast({ title: "Error", description: "Selecciona una parcela y escribe el nuevo nombre", variant: "destructive" });
+      return;
+    }
+    setRenaming(true);
+    const { error, count } = await supabase
+      .from("registered_numbers")
+      .update({ parcel_name: renameTo.trim() })
+      .eq("parcel_name", renameFrom);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Parcela renombrada", description: `Se actualizaron los registros de "${renameFrom}" a "${renameTo.trim()}"` });
+      setRenameOpen(false);
+      setRenameFrom("");
+      setRenameTo("");
+      fetch();
+    }
+    setRenaming(false);
+  };
+
   return (
     <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-4">
         <CardTitle className="flex items-center gap-2 font-display text-lg">
           <Phone className="w-5 h-5" /> Números WhatsApp
         </CardTitle>
-        <Button size="sm" onClick={openCreate}><Plus className="w-4 h-4 mr-1" /> Nuevo</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => { setRenameFrom(""); setRenameTo(""); setRenameOpen(true); }}>
+            <Pencil className="w-4 h-4 mr-1" /> Renombrar parcela
+          </Button>
+          <Button size="sm" onClick={openCreate}><Plus className="w-4 h-4 mr-1" /> Nuevo</Button>
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -191,6 +223,39 @@ export default function RegisteredNumbersTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={submitting}>{submitting ? "Guardando..." : "Guardar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename parcel dialog */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="sm:max-w-md border-border">
+          <DialogHeader><DialogTitle className="font-display">Renombrar parcela</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Selecciona una parcela existente y escribe el nuevo nombre. Se actualizarán todos los registros que la tengan.</p>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Parcela actual</Label>
+              <select
+                value={renameFrom}
+                onChange={(e) => setRenameFrom(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Seleccionar parcela...</option>
+                {uniqueParcels.map((p) => (
+                  <option key={p} value={p}>{p} ({numbers.filter((n) => n.parcel_name === p).length} registros)</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Nuevo nombre</Label>
+              <Input value={renameTo} onChange={(e) => setRenameTo(e.target.value)} placeholder="Nuevo nombre de parcela" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameOpen(false)}>Cancelar</Button>
+            <Button onClick={handleRenameParcel} disabled={renaming || !renameFrom || !renameTo.trim()}>
+              {renaming ? "Renombrando..." : "Renombrar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
