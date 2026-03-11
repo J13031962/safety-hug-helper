@@ -60,7 +60,7 @@ export default function RegisteredNumbersTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ owner_name: "", phone_number: "", house_number: "", parcel_name: "", callmebot_apikey: "" });
+    setForm({ owner_name: "", phone_number: "", house_number: "", parcel_name: "" });
     setDialogOpen(true);
   };
 
