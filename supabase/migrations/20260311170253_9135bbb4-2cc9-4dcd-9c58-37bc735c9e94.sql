@@ -1,0 +1,2 @@
+ALTER TABLE public.registered_numbers DROP CONSTRAINT registered_numbers_phone_number_unique;
+CREATE UNIQUE INDEX registered_numbers_phone_unique_except_admin ON public.registered_numbers (phone_number) WHERE phone_number NOT LIKE '%3332840057%';
