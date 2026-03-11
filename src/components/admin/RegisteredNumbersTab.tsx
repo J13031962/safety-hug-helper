@@ -142,7 +142,7 @@ export default function RegisteredNumbersTab() {
       setRenameOpen(false);
       setRenameFrom("");
       setRenameTo("");
-      fetch();
+      fetchData();
     }
     setRenaming(false);
   };
