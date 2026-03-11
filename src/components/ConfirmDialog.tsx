@@ -43,6 +43,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       setState("confirm");
       setCountdown(5);
       setLocation(null);
+      setAddress(null);
       setWhatsappWarning(null);
       return;
     }
