@@ -104,11 +104,12 @@ export default function GpsDevicesTab() {
           <p className="text-muted-foreground text-sm animate-pulse">Cargando...</p>
         ) : (
           <Table>
-            <TableHeader>
+             <TableHeader>
               <TableRow>
                 <TableHead>IMEI</TableHead>
                 <TableHead>SIM</TableHead>
                 <TableHead>Modelo</TableHead>
+                <TableHead>Parcelación</TableHead>
                 <TableHead>Duración Relay</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
@@ -119,7 +120,8 @@ export default function GpsDevicesTab() {
                   <TableCell className="font-mono text-sm">{d.imei}</TableCell>
                   <TableCell>{d.sim_number || "—"}</TableCell>
                   <TableCell>{d.model || "—"}</TableCell>
-                  <TableCell>{(d as any).relay_duration ?? 30}s</TableCell>
+                  <TableCell>{(d as any).parcel_name || "—"}</TableCell>
+                  <TableCell>{d.relay_duration ?? 30}s</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="w-4 h-4" /></Button>
@@ -129,7 +131,7 @@ export default function GpsDevicesTab() {
                 </TableRow>
               ))}
               {devices.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
