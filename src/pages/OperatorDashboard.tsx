@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { LogOut, ArrowLeft, Headphones, MapPin, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import AlarmTimer from "@/components/AlarmTimer";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Alarm = Tables<"alarms">;
