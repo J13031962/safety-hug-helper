@@ -13,6 +13,14 @@ const ALARM_LABELS: Record<string, string> = {
   disaster: "⚠️ DESASTRE",
 };
 
+// Normalize phone: ensure +57 prefix for Colombian numbers
+const normalize = (phone: string) => {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("57") && digits.length >= 12) return `+${digits}`;
+  if (digits.length === 10 && digits.startsWith("3")) return `+57${digits}`;
+  return phone.startsWith("+") ? phone : `+${digits}`;
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -24,6 +32,26 @@ Deno.serve(async (req) => {
       throw new Error("TEXTMEBOT_API_KEY not configured");
     }
 
+    const body = await req.json();
+
+    // Action: get_group_id — fetch group ID from invite code
+    if (body.action === "get_group_id") {
+      const { invite_code } = body;
+      if (!invite_code) throw new Error("invite_code is required");
+
+      const url = `https://api.textmebot.com/group_info.php?apikey=${encodeURIComponent(TEXTMEBOT_API_KEY)}&invite_code=${encodeURIComponent(invite_code)}`;
+      console.log("Fetching group info for invite code:", invite_code);
+      const res = await fetch(url);
+      const text = await res.text();
+      console.log("Group info response:", text.substring(0, 500));
+
+      return new Response(
+        JSON.stringify({ success: true, response: text }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Normal alarm flow
     const {
       alarm_type,
       sender_name,
@@ -33,7 +61,7 @@ Deno.serve(async (req) => {
       latitude,
       longitude,
       address,
-    } = await req.json();
+    } = body;
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -52,13 +80,6 @@ Deno.serve(async (req) => {
     const { data: contacts, error: dbErr } = await query;
     if (dbErr) throw dbErr;
 
-    if (!contacts || contacts.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, sent: 0, message: "No contacts found" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Build message
     const label = ALARM_LABELS[alarm_type] || `🚨 ${alarm_type?.toUpperCase()}`;
     let msg = `${label}\n`;
@@ -71,18 +92,53 @@ Deno.serve(async (req) => {
     }
     if (phone_number) msg += `📞 ${phone_number}`;
 
-    
-
-    // Normalize phone: ensure +57 prefix for Colombian numbers
-    const normalize = (phone: string) => {
-      const digits = phone.replace(/\D/g, "");
-      if (digits.startsWith("57") && digits.length >= 12) return `+${digits}`;
-      if (digits.length === 10 && digits.startsWith("3")) return `+57${digits}`;
-      return phone.startsWith("+") ? phone : `+${digits}`;
-    };
-
-    // Send to all contacts via TextMeBot sequentially (TextMeBot limit: 1 message each 5s)
     const results = [];
+
+    // 1) Send to WhatsApp group "teleguardia" first
+    const WHATSAPP_GROUP_ID = Deno.env.get("WHATSAPP_GROUP_ID");
+    if (WHATSAPP_GROUP_ID) {
+      try {
+        const formData = new URLSearchParams();
+        formData.append("recipient", WHATSAPP_GROUP_ID);
+        formData.append("apikey", TEXTMEBOT_API_KEY);
+        formData.append("text", msg);
+
+        console.log(`Sending to group: ${WHATSAPP_GROUP_ID}`);
+        const res = await fetch("https://api.textmebot.com/send.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formData.toString(),
+        });
+        const text = await res.text();
+        console.log(`TextMeBot -> GROUP: ${res.status} ${text.substring(0, 200)}`);
+        results.push({
+          phone: "GROUP:" + WHATSAPP_GROUP_ID,
+          ok: res.status >= 200 && res.status < 300,
+          httpStatus: res.status,
+          providerResponse: text.substring(0, 200),
+        });
+
+        // Wait 6s before individual messages
+        if (contacts && contacts.length > 0) {
+          await new Promise((r) => setTimeout(r, 6000));
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error(`TextMeBot -> GROUP: FAILED ${errorMessage}`);
+        results.push({ phone: "GROUP", ok: false, httpStatus: 0, providerResponse: errorMessage });
+      }
+    } else {
+      console.log("No WHATSAPP_GROUP_ID configured, skipping group message");
+    }
+
+    // 2) Send to individual contacts
+    if (!contacts || contacts.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, sent: results.filter(r => r.ok).length, results, message: "No individual contacts found" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     for (const [index, contact] of contacts.entries()) {
       const recipient = normalize(contact.phone_number);
 
@@ -114,7 +170,7 @@ Deno.serve(async (req) => {
         results.push({ phone: recipient, ok: false, httpStatus: 0, providerResponse: errorMessage });
       }
 
-      // 6s delay to stay above provider rate limit (1 message / 5 seconds)
+      // 6s delay between messages
       if (index < contacts.length - 1) {
         await new Promise((r) => setTimeout(r, 6000));
       }
@@ -125,7 +181,7 @@ Deno.serve(async (req) => {
     const firstError = results.find((r) => !r.ok)?.providerResponse ?? null;
 
     return new Response(
-      JSON.stringify({ success: failed === 0, sent, failed, total: contacts.length, first_error: firstError }),
+      JSON.stringify({ success: failed === 0, sent, failed, total: results.length, first_error: firstError }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
