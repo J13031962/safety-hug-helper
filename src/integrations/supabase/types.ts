@@ -101,6 +101,27 @@ export type Database = {
         }
         Relationships: []
       }
+      parcels: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          whatsapp_group_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          whatsapp_group_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          whatsapp_group_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
