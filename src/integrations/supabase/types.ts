@@ -73,6 +73,7 @@ export type Database = {
           imei: string
           model: string | null
           parcel_name: string | null
+          relay_active_until: string | null
           relay_duration: number
           sim_number: string | null
         }
@@ -83,6 +84,7 @@ export type Database = {
           imei: string
           model?: string | null
           parcel_name?: string | null
+          relay_active_until?: string | null
           relay_duration?: number
           sim_number?: string | null
         }
@@ -93,6 +95,7 @@ export type Database = {
           imei?: string
           model?: string | null
           parcel_name?: string | null
+          relay_active_until?: string | null
           relay_duration?: number
           sim_number?: string | null
         }
