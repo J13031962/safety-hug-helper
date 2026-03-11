@@ -15,10 +15,11 @@ type GpsDevice = Tables<"gps_devices">;
 
 export default function GpsDevicesTab() {
   const [devices, setDevices] = useState<GpsDevice[]>([]);
+  const [parcels, setParcels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<GpsDevice | null>(null);
-  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30" });
+  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_name: "" });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchDevices = async () => {
