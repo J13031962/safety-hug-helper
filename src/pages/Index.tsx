@@ -57,7 +57,7 @@ const IndexContent = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emergency-panic inline-block" />
-              <h1 className="text-lg font-display font-bold tracking-tight">SOS Alert</h1>
+              <h1 className="text-lg font-display font-bold tracking-tight">SmartSOS</h1>
             </div>
             <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground">
               <MapPin className="w-3 h-3" />

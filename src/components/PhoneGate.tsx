@@ -99,7 +99,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
           <div className="w-20 h-20 rounded-full border-2 border-emergency-panic/40 flex items-center justify-center bg-emergency-panic/10">
             <Shield className="w-10 h-10 text-emergency-panic" />
           </div>
-          <h1 className="text-2xl font-display font-bold tracking-tight">SOS Alert</h1>
+          <h1 className="text-2xl font-display font-bold tracking-tight">SmartSOS</h1>
           <p className="text-sm text-muted-foreground text-center">
             Ingresa tu número de celular registrado para acceder
           </p>
