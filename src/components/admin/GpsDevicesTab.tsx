@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Radio } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -14,10 +15,11 @@ type GpsDevice = Tables<"gps_devices">;
 
 export default function GpsDevicesTab() {
   const [devices, setDevices] = useState<GpsDevice[]>([]);
+  const [parcels, setParcels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<GpsDevice | null>(null);
-  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30" });
+  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_name: "" });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchDevices = async () => {
@@ -27,17 +29,23 @@ export default function GpsDevicesTab() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchDevices(); }, []);
+  const fetchParcels = async () => {
+    const { data } = await supabase.from("registered_numbers").select("parcel_name");
+    const unique = [...new Set((data || []).map(r => r.parcel_name).filter(Boolean))] as string[];
+    setParcels(unique.sort());
+  };
+
+  useEffect(() => { fetchDevices(); fetchParcels(); }, []);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30" });
+    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_name: "" });
     setDialogOpen(true);
   };
 
   const openEdit = (d: GpsDevice) => {
     setEditing(d);
-    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String((d as any).relay_duration ?? 30) });
+    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), parcel_name: (d as any).parcel_name || "" });
     setDialogOpen(true);
   };
 
@@ -47,7 +55,7 @@ export default function GpsDevicesTab() {
       return;
     }
     setSubmitting(true);
-    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30 };
+    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30, parcel_name: form.parcel_name || null };
 
     if (editing) {
       const { error } = await supabase.from("gps_devices").update(payload).eq("id", editing.id);
@@ -96,11 +104,12 @@ export default function GpsDevicesTab() {
           <p className="text-muted-foreground text-sm animate-pulse">Cargando...</p>
         ) : (
           <Table>
-            <TableHeader>
+             <TableHeader>
               <TableRow>
                 <TableHead>IMEI</TableHead>
                 <TableHead>SIM</TableHead>
                 <TableHead>Modelo</TableHead>
+                <TableHead>Parcelación</TableHead>
                 <TableHead>Duración Relay</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
@@ -111,7 +120,8 @@ export default function GpsDevicesTab() {
                   <TableCell className="font-mono text-sm">{d.imei}</TableCell>
                   <TableCell>{d.sim_number || "—"}</TableCell>
                   <TableCell>{d.model || "—"}</TableCell>
-                  <TableCell>{(d as any).relay_duration ?? 30}s</TableCell>
+                  <TableCell>{(d as any).parcel_name || "—"}</TableCell>
+                  <TableCell>{d.relay_duration ?? 30}s</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="w-4 h-4" /></Button>
@@ -121,7 +131,7 @@ export default function GpsDevicesTab() {
                 </TableRow>
               ))}
               {devices.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -135,6 +145,16 @@ export default function GpsDevicesTab() {
             <div className="space-y-2"><Label>IMEI</Label><Input value={form.imei} onChange={(e) => setForm((f) => ({ ...f, imei: e.target.value }))} placeholder="Ej: 123456789012345" /></div>
             <div className="space-y-2"><Label>Número SIM</Label><Input value={form.sim_number} onChange={(e) => setForm((f) => ({ ...f, sim_number: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Modelo</Label><Input value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} placeholder="Ej: VT08S" /></div>
+            <div className="space-y-2">
+              <Label>Parcelación</Label>
+              <Select value={form.parcel_name} onValueChange={(v) => setForm((f) => ({ ...f, parcel_name: v === "__none__" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar parcelación" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin asignar</SelectItem>
+                  {parcels.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Duración de activación (segundos)</Label>
               <Input type="number" min="5" max="300" value={form.relay_duration} onChange={(e) => setForm((f) => ({ ...f, relay_duration: e.target.value }))} placeholder="30" />
