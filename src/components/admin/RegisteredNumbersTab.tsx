@@ -67,8 +67,12 @@ export default function RegisteredNumbersTab() {
       else toast({ title: "Número actualizado" });
     } else {
       const { error } = await supabase.from("registered_numbers").insert(payload);
-      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-      else toast({ title: "Número registrado" });
+      if (error) {
+        const isDuplicate = error.message.includes("duplicate") || error.code === "23505";
+        toast({ title: "Error", description: isDuplicate ? "Este número de teléfono ya está registrado" : error.message, variant: "destructive" });
+        setSubmitting(false);
+        return;
+      } else toast({ title: "Número registrado" });
     }
     setDialogOpen(false);
     setSubmitting(false);
