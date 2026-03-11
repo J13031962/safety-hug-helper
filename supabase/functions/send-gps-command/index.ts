@@ -44,15 +44,6 @@ async function listDevices() {
   return { status: res.status, data: await res.json().catch(() => null) };
 }
 
-// Schedule restore after delay (runs in background)
-async function scheduleRestore(imei: string, delaySec: number, token: string) {
-  console.log(`[GPS] Scheduling power restore for ${imei} in ${delaySec}s`);
-  await new Promise((resolve) => setTimeout(resolve, delaySec * 1000));
-  console.log(`[GPS] Restoring power for ${imei}`);
-  const result = await restorePower(imei, token);
-  console.log(`[GPS] Restore result for ${imei}:`, result);
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -103,31 +94,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Alarm trigger: cut power → wait relay_duration → restore ──
+    // ── Alarm trigger: relay-on with concurrency control ──
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    let targetDevices: { imei: string; relay_duration: number }[] = [];
+    // Get all devices with their current relay state
+    const { data: devices } = await supabase
+      .from("gps_devices")
+      .select("imei, relay_duration, relay_active_until");
 
-    if (imei) {
-      // Single device - get its relay_duration
-      const { data } = await supabase
-        .from("gps_devices")
-        .select("imei, relay_duration")
-        .eq("imei", imei)
-        .single();
-      targetDevices = data ? [data] : [{ imei, relay_duration: 30 }];
-    } else {
-      // All devices
-      const { data: devices } = await supabase
-        .from("gps_devices")
-        .select("imei, relay_duration");
-      targetDevices = (devices || []).map((d: any) => ({
-        imei: d.imei,
-        relay_duration: d.relay_duration ?? 30,
-      }));
-    }
+    const targetDevices = (devices || []).filter((d: any) =>
+      imei ? d.imei === imei : true
+    );
 
     if (targetDevices.length === 0) {
       return new Response(JSON.stringify({
@@ -136,38 +115,99 @@ Deno.serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const results: { imei: string; success: boolean; relay_duration: number; error?: string }[] = [];
+    const now = new Date();
+    const results: any[] = [];
     const restorePromises: Promise<void>[] = [];
 
     for (const device of targetDevices) {
-      try {
-        console.log(`[GPS] Cutting power on ${device.imei} (restore in ${device.relay_duration}s)`);
-        const result = await cutPower(device.imei, token);
-        const success = result.status === 200;
+      const duration = device.relay_duration ?? 30;
+      const newActiveUntil = new Date(now.getTime() + duration * 1000);
+      const currentActiveUntil = device.relay_active_until
+        ? new Date(device.relay_active_until)
+        : null;
+      const isRelayActive = currentActiveUntil && currentActiveUntil > now;
 
+      // Always extend the relay_active_until timestamp
+      await supabase
+        .from("gps_devices")
+        .update({ relay_active_until: newActiveUntil.toISOString() })
+        .eq("imei", device.imei);
+
+      if (isRelayActive) {
+        // Relay already ON — just extended the timer, no need to send power-off again
+        console.log(`[GPS] Relay already active on ${device.imei} until ${currentActiveUntil!.toISOString()}, extended to ${newActiveUntil.toISOString()}`);
         results.push({
           imei: device.imei,
-          success,
-          relay_duration: device.relay_duration,
+          success: true,
+          relay_duration: duration,
+          action: "extended",
+          active_until: newActiveUntil.toISOString(),
         });
-
-        // Schedule automatic restore in background
-        if (success && device.relay_duration > 0) {
-          restorePromises.push(scheduleRestore(device.imei, device.relay_duration, token));
+      } else {
+        // Relay is OFF — send power-off command
+        console.log(`[GPS] Activating relay on ${device.imei} for ${duration}s`);
+        try {
+          const result = await cutPower(device.imei, token);
+          const success = result.status === 200;
+          results.push({
+            imei: device.imei,
+            success,
+            relay_duration: duration,
+            action: "activated",
+            active_until: newActiveUntil.toISOString(),
+          });
+        } catch (err) {
+          console.error(`[GPS] Error activating ${device.imei}:`, err);
+          results.push({
+            imei: device.imei,
+            success: false,
+            relay_duration: duration,
+            action: "error",
+            error: err instanceof Error ? err.message : "Error desconocido",
+          });
         }
-      } catch (err) {
-        console.error(`[GPS] Error for ${device.imei}:`, err);
-        results.push({
-          imei: device.imei,
-          success: false,
-          relay_duration: device.relay_duration,
-          error: err instanceof Error ? err.message : "Error desconocido",
-        });
       }
+
+      // Schedule restore: wait until relay_active_until, then check if it should restore
+      restorePromises.push((async () => {
+        const waitMs = newActiveUntil.getTime() - Date.now();
+        if (waitMs > 0) {
+          console.log(`[GPS] Scheduling restore check for ${device.imei} in ${Math.round(waitMs / 1000)}s`);
+          await new Promise((resolve) => setTimeout(resolve, waitMs));
+        }
+
+        // Re-read the device to check if relay_active_until was extended by another alarm
+        const { data: current } = await supabase
+          .from("gps_devices")
+          .select("relay_active_until")
+          .eq("imei", device.imei)
+          .single();
+
+        const currentUntil = current?.relay_active_until
+          ? new Date(current.relay_active_until)
+          : null;
+        const nowCheck = new Date();
+
+        if (currentUntil && currentUntil > nowCheck) {
+          // Another alarm extended the timer — don't restore yet
+          console.log(`[GPS] Restore skipped for ${device.imei}: timer extended to ${currentUntil.toISOString()}`);
+          return;
+        }
+
+        // Timer expired — send power-on (relay off)
+        console.log(`[GPS] Restoring power on ${device.imei}`);
+        const restoreResult = await restorePower(device.imei, token);
+        console.log(`[GPS] Restore result for ${device.imei}:`, restoreResult);
+
+        // Clear the relay_active_until
+        await supabase
+          .from("gps_devices")
+          .update({ relay_active_until: null })
+          .eq("imei", device.imei);
+      })());
     }
 
-    // Don't await restorePromises - let them run in background
-    // Use EdgeRuntime.waitUntil if available, otherwise fire-and-forget
+    // Let restore promises run in background
     Promise.all(restorePromises).catch((err) =>
       console.error("[GPS] Error in scheduled restores:", err)
     );
@@ -175,7 +215,6 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: results.some((r) => r.success),
       alarm_type,
-      action: "power-off → auto-restore",
       devices_targeted: targetDevices.length,
       results,
     }), {
