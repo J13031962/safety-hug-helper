@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
     }
     if (phone_number) msg += `📞 ${phone_number}`;
 
-    const encoded = encodeURIComponent(msg);
+    
 
     // Normalize phone: ensure +57 prefix for Colombian numbers
     const normalize = (phone: string) => {
