@@ -115,7 +115,7 @@ export default function RegisteredNumbersTab() {
     }
     setDialogOpen(false);
     setSubmitting(false);
-    fetch();
+    fetchData();
   };
 
   const handleDelete = async (n: RegisteredNumber) => {
