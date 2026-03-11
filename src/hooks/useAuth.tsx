@@ -30,35 +30,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchRole = useCallback(async (userId: string) => {
-    try {
-      const query = supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle();
-      const result = await withTimeout(
-        Promise.resolve(query),
-        5000
-      );
-      const { data, error } = result as { data: { role: AppRole } | null; error: any };
-      if (error) {
-        // Fallback: try RPC
-        const { data: hasAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" as AppRole });
-        if (hasAdmin) return setRole("admin");
-        const { data: hasOp } = await supabase.rpc("has_role", { _user_id: userId, _role: "operator" as AppRole });
-        if (hasOp) return setRole("operator");
-        setRole(null);
+  const fetchRole = useCallback(async (userId: string, retries = 2): Promise<void> => {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const result = await withTimeout(
+          Promise.resolve(supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle()),
+          5000
+        ) as { data: { role: AppRole } | null; error: any };
+        const { data, error } = result;
+        if (error) {
+          // Fallback: try RPC
+          const { data: hasAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" as AppRole });
+          if (hasAdmin) { setRole("admin"); return; }
+          const { data: hasOp } = await supabase.rpc("has_role", { _user_id: userId, _role: "operator" as AppRole });
+          if (hasOp) { setRole("operator"); return; }
+          const { data: hasDir } = await supabase.rpc("has_role", { _user_id: userId, _role: "director_monitoreo" as AppRole });
+          if (hasDir) { setRole("director_monitoreo"); return; }
+          const { data: hasSup } = await supabase.rpc("has_role", { _user_id: userId, _role: "supervisor_central" as AppRole });
+          if (hasSup) { setRole("supervisor_central"); return; }
+          setRole(null);
+          return;
+        }
+        setRole(data?.role ?? null);
         return;
+      } catch {
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        } else {
+          // Keep existing role on failure instead of clearing it
+        }
       }
-      setRole(data?.role ?? null);
-    } catch {
-      setRole(null);
     }
   }, []);
 
+  // Periodic role refresh to prevent "no role" after token refresh
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      fetchRole(user.id, 1);
+    }, 5 * 60 * 1000); // every 5 minutes
+    return () => clearInterval(interval);
+  }, [user, fetchRole]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        await fetchRole(session.user.id);
+        // Use setTimeout to avoid blocking the auth state change callback
+        setTimeout(() => {
+          if (mounted) fetchRole(session.user.id);
+        }, 0);
       } else {
         setRole(null);
       }
@@ -66,16 +91,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchRole(session.user.id);
+        fetchRole(session.user.id).finally(() => {
+          if (mounted) setLoading(false);
+        });
       } else {
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchRole]);
 
   const signIn = async (email: string, password: string) => {
