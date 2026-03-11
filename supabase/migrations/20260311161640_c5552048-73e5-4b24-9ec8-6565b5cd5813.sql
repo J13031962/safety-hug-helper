@@ -1,0 +1,1 @@
+ALTER TABLE public.gps_devices ADD COLUMN relay_duration integer NOT NULL DEFAULT 30;

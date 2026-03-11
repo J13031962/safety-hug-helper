@@ -17,7 +17,7 @@ export default function GpsDevicesTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<GpsDevice | null>(null);
-  const [form, setForm] = useState({ imei: "", sim_number: "", model: "" });
+  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30" });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchDevices = async () => {
@@ -31,13 +31,13 @@ export default function GpsDevicesTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ imei: "", sim_number: "", model: "" });
+    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30" });
     setDialogOpen(true);
   };
 
   const openEdit = (d: GpsDevice) => {
     setEditing(d);
-    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "" });
+    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String((d as any).relay_duration ?? 30) });
     setDialogOpen(true);
   };
 
@@ -47,7 +47,7 @@ export default function GpsDevicesTab() {
       return;
     }
     setSubmitting(true);
-    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null };
+    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30 };
 
     if (editing) {
       const { error } = await supabase.from("gps_devices").update(payload).eq("id", editing.id);
@@ -88,6 +88,7 @@ export default function GpsDevicesTab() {
                 <TableHead>IMEI</TableHead>
                 <TableHead>SIM</TableHead>
                 <TableHead>Modelo</TableHead>
+                <TableHead>Duración Relay</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -97,6 +98,7 @@ export default function GpsDevicesTab() {
                   <TableCell className="font-mono text-sm">{d.imei}</TableCell>
                   <TableCell>{d.sim_number || "—"}</TableCell>
                   <TableCell>{d.model || "—"}</TableCell>
+                  <TableCell>{(d as any).relay_duration ?? 30}s</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="w-4 h-4" /></Button>
@@ -106,7 +108,7 @@ export default function GpsDevicesTab() {
                 </TableRow>
               ))}
               {devices.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -120,6 +122,11 @@ export default function GpsDevicesTab() {
             <div className="space-y-2"><Label>IMEI</Label><Input value={form.imei} onChange={(e) => setForm((f) => ({ ...f, imei: e.target.value }))} placeholder="Ej: 123456789012345" /></div>
             <div className="space-y-2"><Label>Número SIM</Label><Input value={form.sim_number} onChange={(e) => setForm((f) => ({ ...f, sim_number: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Modelo</Label><Input value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} placeholder="Ej: VT08S" /></div>
+            <div className="space-y-2">
+              <Label>Duración de activación (segundos)</Label>
+              <Input type="number" min="5" max="300" value={form.relay_duration} onChange={(e) => setForm((f) => ({ ...f, relay_duration: e.target.value }))} placeholder="30" />
+              <p className="text-xs text-muted-foreground">Tiempo que el relay permanece activo antes de restaurarse automáticamente.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
