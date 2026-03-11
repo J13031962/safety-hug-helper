@@ -19,6 +19,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const TEXTMEBOT_API_KEY = Deno.env.get("TEXTMEBOT_API_KEY");
+    if (!TEXTMEBOT_API_KEY) {
+      throw new Error("TEXTMEBOT_API_KEY not configured");
+    }
+
     const {
       alarm_type,
       sender_name,
@@ -38,7 +43,7 @@ Deno.serve(async (req) => {
     // Get contacts — filter by parcel if provided
     let query = supabase
       .from("registered_numbers")
-      .select("phone_number, owner_name, callmebot_apikey, parcel_name");
+      .select("phone_number, owner_name, parcel_name");
 
     if (parcel_name) {
       query = query.eq("parcel_name", parcel_name);
@@ -68,17 +73,15 @@ Deno.serve(async (req) => {
 
     const encoded = encodeURIComponent(msg);
 
-    // Send to all contacts in parallel
+    // Send to all contacts via TextMeBot in parallel
     const results = await Promise.allSettled(
-      contacts
-        .filter((c) => c.callmebot_apikey)
-        .map(async (contact) => {
-          const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(contact.phone_number)}&text=${encoded}&apikey=${encodeURIComponent(contact.callmebot_apikey)}`;
-          const res = await fetch(url);
-          const text = await res.text();
-          console.log(`CallMeBot -> ${contact.phone_number}: ${res.status} ${text.substring(0, 100)}`);
-          return { phone: contact.phone_number, status: res.status };
-        })
+      contacts.map(async (contact) => {
+        const url = `https://api.textmebot.com/send.php?recipient=${encodeURIComponent(contact.phone_number)}&apikey=${encodeURIComponent(TEXTMEBOT_API_KEY)}&text=${encoded}`;
+        const res = await fetch(url);
+        const text = await res.text();
+        console.log(`TextMeBot -> ${contact.phone_number}: ${res.status} ${text.substring(0, 100)}`);
+        return { phone: contact.phone_number, status: res.status };
+      })
     );
 
     const sent = results.filter((r) => r.status === "fulfilled").length;

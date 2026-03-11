@@ -216,7 +216,7 @@ export default function RegisteredNumbersTab() {
                 </div>
               )}
             </div>
-            <div className="space-y-2"><Label>API Key CallMeBot</Label><Input value="zjuu3vP3HD6Z" readOnly className="bg-muted cursor-not-allowed" /></div>
+            
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
