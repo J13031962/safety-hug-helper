@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle2, MapPin, Loader2, ShieldX } from "lucide-react";
+import { reverseGeocode } from "@/lib/geocode";
 
 type AlarmType = "panic" | "medical" | "fire" | "disaster";
 
