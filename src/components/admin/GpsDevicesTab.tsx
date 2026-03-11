@@ -37,7 +37,7 @@ export default function GpsDevicesTab() {
 
   const openEdit = (d: GpsDevice) => {
     setEditing(d);
-    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "" });
+    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String((d as any).relay_duration ?? 30) });
     setDialogOpen(true);
   };
 
