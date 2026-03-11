@@ -275,6 +275,7 @@ export default function OperatorDashboard() {
                           <div><span className="text-muted-foreground">Operador:</span> <span className="text-green-400 font-medium">{alarm.processed_by ? (operatorMap[alarm.processed_by] || "—") : "—"}</span></div>
                           <div><span className="text-muted-foreground">Recibido:</span> {new Date(alarm.created_at).toLocaleString("es-VE")}</div>
                           <div><span className="text-muted-foreground">Procesado:</span> {alarm.processed_at ? new Date(alarm.processed_at).toLocaleString("es-VE") : "—"}</div>
+                          <div><span className="text-muted-foreground">Tiempo de respuesta:</span> <AlarmTimer createdAt={alarm.created_at} processedAt={alarm.processed_at} status={alarm.status} /></div>
                         </div>
                       )}
                       {alarm.status !== "resolved" && <p className="text-xs text-muted-foreground mt-1">{new Date(alarm.created_at).toLocaleString("es-VE")}</p>}
