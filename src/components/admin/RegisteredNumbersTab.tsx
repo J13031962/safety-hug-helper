@@ -19,9 +19,14 @@ export default function RegisteredNumbersTab() {
   const [editing, setEditing] = useState<RegisteredNumber | null>(null);
   const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_name: "", callmebot_apikey: "" });
   const [submitting, setSubmitting] = useState(false);
-  const [parcelSuggestions, setParcelSuggestions] = useState<string[]>([]);
   const [showParcelSuggestions, setShowParcelSuggestions] = useState(false);
   const parcelRef = useRef<HTMLDivElement>(null);
+
+  // Rename parcel dialog
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameFrom, setRenameFrom] = useState("");
+  const [renameTo, setRenameTo] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   const uniqueParcels = useMemo(() => {
     const parcels = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
