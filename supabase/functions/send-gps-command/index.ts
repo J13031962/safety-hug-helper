@@ -18,19 +18,6 @@ function getHeaders(token: string): Record<string, string> {
   };
 }
 
-// Map alarm type to GPS action
-function getActionForAlarmType(alarmType: string): "power-off" | "power-on" {
-  switch (alarmType) {
-    case "panic":
-    case "medical":
-    case "fire":
-    case "disaster":
-      return "power-off"; // Cut power / activate relay
-    default:
-      return "power-off";
-  }
-}
-
 async function cutPower(imei: string, token: string) {
   const res = await fetch(`${GPS_API_BASE}/device/${imei}/power-off`, {
     method: "POST",
@@ -57,6 +44,15 @@ async function listDevices() {
   return { status: res.status, data: await res.json().catch(() => null) };
 }
 
+// Schedule restore after delay (runs in background)
+async function scheduleRestore(imei: string, delaySec: number, token: string) {
+  console.log(`[GPS] Scheduling power restore for ${imei} in ${delaySec}s`);
+  await new Promise((resolve) => setTimeout(resolve, delaySec * 1000));
+  console.log(`[GPS] Restoring power for ${imei}`);
+  const result = await restorePower(imei, token);
+  console.log(`[GPS] Restore result for ${imei}:`, result);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -73,9 +69,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const { alarm_type, imei, action } = body;
-    // action can be: "power-off", "power-on", "status", "list"
 
-    // Special actions
+    // Special actions (manual control from admin)
     if (action === "list") {
       const result = await listDevices();
       return new Response(JSON.stringify(result), {
@@ -94,25 +89,44 @@ Deno.serve(async (req) => {
 
     if (action === "power-on" && imei) {
       const result = await restorePower(imei, token);
-      console.log(`[GPS] Restored power for ${imei}:`, result);
       return new Response(JSON.stringify({ success: result.status === 200, ...result }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Default: alarm trigger — cut power on target devices
+    if (action === "power-off" && imei) {
+      const result = await cutPower(imei, token);
+      return new Response(JSON.stringify({ success: result.status === 200, ...result }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Alarm trigger: cut power → wait relay_duration → restore ──
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    let targetDevices: { imei: string }[] = [];
+    let targetDevices: { imei: string; relay_duration: number }[] = [];
 
     if (imei) {
-      targetDevices = [{ imei }];
+      // Single device - get its relay_duration
+      const { data } = await supabase
+        .from("gps_devices")
+        .select("imei, relay_duration")
+        .eq("imei", imei)
+        .single();
+      targetDevices = data ? [data] : [{ imei, relay_duration: 30 }];
     } else {
-      const { data: devices } = await supabase.from("gps_devices").select("imei");
-      targetDevices = devices || [];
+      // All devices
+      const { data: devices } = await supabase
+        .from("gps_devices")
+        .select("imei, relay_duration");
+      targetDevices = (devices || []).map((d: any) => ({
+        imei: d.imei,
+        relay_duration: d.relay_duration ?? 30,
+      }));
     }
 
     if (targetDevices.length === 0) {
@@ -122,43 +136,52 @@ Deno.serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const gpsAction = action || getActionForAlarmType(alarm_type || "panic");
-    const results: { imei: string; success: boolean; error?: string; response?: unknown }[] = [];
+    const results: { imei: string; success: boolean; relay_duration: number; error?: string }[] = [];
+    const restorePromises: Promise<void>[] = [];
 
     for (const device of targetDevices) {
       try {
-        console.log(`[GPS] Sending ${gpsAction} to device ${device.imei}`);
-        const result = gpsAction === "power-on"
-          ? await restorePower(device.imei, token)
-          : await cutPower(device.imei, token);
+        console.log(`[GPS] Cutting power on ${device.imei} (restore in ${device.relay_duration}s)`);
+        const result = await cutPower(device.imei, token);
+        const success = result.status === 200;
 
-        console.log(`[GPS] Response for ${device.imei}:`, result);
         results.push({
           imei: device.imei,
-          success: result.status === 200,
-          response: result.data,
+          success,
+          relay_duration: device.relay_duration,
         });
+
+        // Schedule automatic restore in background
+        if (success && device.relay_duration > 0) {
+          restorePromises.push(scheduleRestore(device.imei, device.relay_duration, token));
+        }
       } catch (err) {
         console.error(`[GPS] Error for ${device.imei}:`, err);
         results.push({
           imei: device.imei,
           success: false,
+          relay_duration: device.relay_duration,
           error: err instanceof Error ? err.message : "Error desconocido",
         });
       }
     }
 
+    // Don't await restorePromises - let them run in background
+    // Use EdgeRuntime.waitUntil if available, otherwise fire-and-forget
+    Promise.all(restorePromises).catch((err) =>
+      console.error("[GPS] Error in scheduled restores:", err)
+    );
+
     return new Response(JSON.stringify({
-      success: results.some(r => r.success),
+      success: results.some((r) => r.success),
       alarm_type,
-      action: gpsAction,
+      action: "power-off → auto-restore",
       devices_targeted: targetDevices.length,
       results,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
   } catch (err) {
     console.error("[GPS] Error:", err);
     return new Response(JSON.stringify({
