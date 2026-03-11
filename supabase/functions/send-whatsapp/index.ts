@@ -73,10 +73,19 @@ Deno.serve(async (req) => {
 
     const encoded = encodeURIComponent(msg);
 
+    // Normalize phone: ensure +57 prefix for Colombian numbers
+    const normalize = (phone: string) => {
+      const digits = phone.replace(/\D/g, "");
+      if (digits.startsWith("57") && digits.length >= 12) return `+${digits}`;
+      if (digits.length === 10 && digits.startsWith("3")) return `+57${digits}`;
+      return phone.startsWith("+") ? phone : `+${digits}`;
+    };
+
     // Send to all contacts via TextMeBot in parallel
     const results = await Promise.allSettled(
       contacts.map(async (contact) => {
-        const url = `https://api.textmebot.com/send.php?recipient=${encodeURIComponent(contact.phone_number)}&apikey=${encodeURIComponent(TEXTMEBOT_API_KEY)}&text=${encoded}`;
+        const recipient = normalize(contact.phone_number);
+        const url = `https://api.textmebot.com/send.php?recipient=${encodeURIComponent(recipient)}&apikey=${encodeURIComponent(TEXTMEBOT_API_KEY)}&text=${encoded}`;
         const res = await fetch(url);
         const text = await res.text();
         console.log(`TextMeBot -> ${contact.phone_number}: ${res.status} ${text.substring(0, 100)}`);
