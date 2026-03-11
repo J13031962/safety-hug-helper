@@ -282,19 +282,24 @@ export default function OperatorDashboard() {
                         <Button
                           size="sm"
                           className="bg-emergency-medical hover:bg-emergency-medical/80 text-foreground"
-                          onClick={() => handleProcess(alarm, "processing")}
+                          onClick={async () => {
+                            await handleProcess(alarm, "processing");
+                            setSelectedAlarm(alarm);
+                            setObservations("");
+                          }}
                           disabled={processing}
                         >
                           Atender
                         </Button>
                       )}
-                      {isProcessing && (
+                      {(isProcessing || selectedAlarm?.id === alarm.id) && (
                         <>
                           <Textarea
                             placeholder="Observaciones..."
                             value={selectedAlarm?.id === alarm.id ? observations : ""}
                             onChange={(e) => { setSelectedAlarm(alarm); setObservations(e.target.value); }}
                             className="text-xs min-h-[60px] w-40"
+                            autoFocus={selectedAlarm?.id === alarm.id}
                           />
                           <Button
                             size="sm"
