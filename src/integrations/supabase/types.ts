@@ -69,6 +69,7 @@ export type Database = {
           id: string
           imei: string
           model: string | null
+          relay_duration: number
           sim_number: string | null
         }
         Insert: {
@@ -77,6 +78,7 @@ export type Database = {
           id?: string
           imei: string
           model?: string | null
+          relay_duration?: number
           sim_number?: string | null
         }
         Update: {
@@ -85,6 +87,7 @@ export type Database = {
           id?: string
           imei?: string
           model?: string | null
+          relay_duration?: number
           sim_number?: string | null
         }
         Relationships: []
