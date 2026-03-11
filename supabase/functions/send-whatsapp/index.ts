@@ -13,7 +13,6 @@ const ALARM_LABELS: Record<string, string> = {
   disaster: "⚠️ DESASTRE",
 };
 
-// Normalize phone: ensure +57 prefix for Colombian numbers
 const normalize = (phone: string) => {
   const digits = phone.replace(/\D/g, "");
   if (digits.startsWith("57") && digits.length >= 12) return `+${digits}`;
@@ -45,8 +44,21 @@ Deno.serve(async (req) => {
       const text = await res.text();
       console.log("Group info response:", text.substring(0, 500));
 
+      // Try to parse group_id from JSON response
+      try {
+        const parsed = JSON.parse(text.trim());
+        if (parsed.group_id) {
+          return new Response(
+            JSON.stringify({ success: true, group_id: parsed.group_id, subject: parsed.subject }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch (_) {
+        // Not JSON, return raw
+      }
+
       return new Response(
-        JSON.stringify({ success: true, response: text }),
+        JSON.stringify({ success: false, response: text }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -68,18 +80,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get contacts — filter by parcel if provided
-    let query = supabase
-      .from("registered_numbers")
-      .select("phone_number, owner_name, parcel_name");
-
-    if (parcel_name) {
-      query = query.eq("parcel_name", parcel_name);
-    }
-
-    const { data: contacts, error: dbErr } = await query;
-    if (dbErr) throw dbErr;
-
     // Build message
     const label = ALARM_LABELS[alarm_type] || `🚨 ${alarm_type?.toUpperCase()}`;
     let msg = `${label}\n`;
@@ -94,44 +94,60 @@ Deno.serve(async (req) => {
 
     const results = [];
 
-    // 1) Send to WhatsApp group "teleguardia" first
-    const WHATSAPP_GROUP_ID = Deno.env.get("WHATSAPP_GROUP_ID");
-    if (WHATSAPP_GROUP_ID) {
-      try {
-        const formData = new URLSearchParams();
-        formData.append("recipient", WHATSAPP_GROUP_ID);
-        formData.append("apikey", TEXTMEBOT_API_KEY);
-        formData.append("text", msg);
+    // 1) Send to WhatsApp group for this parcel
+    if (parcel_name) {
+      const { data: parcel } = await supabase
+        .from("parcels")
+        .select("whatsapp_group_id")
+        .eq("name", parcel_name)
+        .maybeSingle();
 
-        console.log(`Sending to group: ${WHATSAPP_GROUP_ID}`);
-        const res = await fetch("https://api.textmebot.com/send.php", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: formData.toString(),
-        });
-        const text = await res.text();
-        console.log(`TextMeBot -> GROUP: ${res.status} ${text.substring(0, 200)}`);
-        results.push({
-          phone: "GROUP:" + WHATSAPP_GROUP_ID,
-          ok: res.status >= 200 && res.status < 300,
-          httpStatus: res.status,
-          providerResponse: text.substring(0, 200),
-        });
+      if (parcel?.whatsapp_group_id) {
+        try {
+          const formData = new URLSearchParams();
+          formData.append("recipient", parcel.whatsapp_group_id);
+          formData.append("apikey", TEXTMEBOT_API_KEY);
+          formData.append("text", msg);
 
-        // Wait 6s before individual messages
-        if (contacts && contacts.length > 0) {
+          console.log(`Sending to group [${parcel_name}]: ${parcel.whatsapp_group_id}`);
+          const res = await fetch("https://api.textmebot.com/send.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: formData.toString(),
+          });
+          const text = await res.text();
+          console.log(`TextMeBot -> GROUP [${parcel_name}]: ${res.status} ${text.substring(0, 200)}`);
+          results.push({
+            phone: `GROUP:${parcel_name}`,
+            ok: res.status >= 200 && res.status < 300,
+            httpStatus: res.status,
+            providerResponse: text.substring(0, 200),
+          });
+
+          // Wait before next message
           await new Promise((r) => setTimeout(r, 6000));
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.error(`TextMeBot -> GROUP [${parcel_name}]: FAILED ${errorMessage}`);
+          results.push({ phone: `GROUP:${parcel_name}`, ok: false, httpStatus: 0, providerResponse: errorMessage });
         }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error(`TextMeBot -> GROUP: FAILED ${errorMessage}`);
-        results.push({ phone: "GROUP", ok: false, httpStatus: 0, providerResponse: errorMessage });
+      } else {
+        console.log(`No WhatsApp group configured for parcel: ${parcel_name}`);
       }
-    } else {
-      console.log("No WHATSAPP_GROUP_ID configured, skipping group message");
     }
 
     // 2) Send to individual contacts
+    let query = supabase
+      .from("registered_numbers")
+      .select("phone_number, owner_name, parcel_name");
+
+    if (parcel_name) {
+      query = query.eq("parcel_name", parcel_name);
+    }
+
+    const { data: contacts, error: dbErr } = await query;
+    if (dbErr) throw dbErr;
+
     if (!contacts || contacts.length === 0) {
       return new Response(
         JSON.stringify({ success: true, sent: results.filter(r => r.ok).length, results, message: "No individual contacts found" }),
@@ -158,19 +174,13 @@ Deno.serve(async (req) => {
         const ok = res.status >= 200 && res.status < 300;
         console.log(`TextMeBot -> ${recipient}: ${res.status} ${text.substring(0, 200)}`);
 
-        results.push({
-          phone: recipient,
-          ok,
-          httpStatus: res.status,
-          providerResponse: text.substring(0, 200),
-        });
+        results.push({ phone: recipient, ok, httpStatus: res.status, providerResponse: text.substring(0, 200) });
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         console.error(`TextMeBot -> ${recipient}: FAILED ${errorMessage}`);
         results.push({ phone: recipient, ok: false, httpStatus: 0, providerResponse: errorMessage });
       }
 
-      // 6s delay between messages
       if (index < contacts.length - 1) {
         await new Promise((r) => setTimeout(r, 6000));
       }
