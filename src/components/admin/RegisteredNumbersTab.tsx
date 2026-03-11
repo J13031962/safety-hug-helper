@@ -230,18 +230,37 @@ export default function RegisteredNumbersTab() {
               />
               {showParcelSuggestions && filteredParcels.length > 0 && (
                 <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-                  {filteredParcels.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                      onClick={() => { setForm((f) => ({ ...f, parcel_name: p })); setShowParcelSuggestions(false); }}
-                    >
-                      {p}
-                    </button>
-                  ))}
+                  {filteredParcels.map((p) => {
+                    const parcelInfo = parcels.find((px) => px.name === p);
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                        onClick={() => { setForm((f) => ({ ...f, parcel_name: p })); setShowParcelSuggestions(false); }}
+                      >
+                        <span>{p}</span>
+                        {parcelInfo?.whatsapp_group_id && (
+                          <span className="ml-2 text-xs text-muted-foreground">✅ Grupo vinculado</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
+              {(() => {
+                const selectedParcel = parcels.find((p) => p.name === form.parcel_name);
+                if (selectedParcel?.whatsapp_group_id) {
+                  return (
+                    <p className="text-xs text-primary">
+                      ✅ Grupo WA: <span className="font-mono">{selectedParcel.whatsapp_group_id}</span>
+                    </p>
+                  );
+                } else if (form.parcel_name && parcels.some((p) => p.name === form.parcel_name)) {
+                  return <p className="text-xs text-muted-foreground">⚠️ Parcela sin grupo de WhatsApp vinculado</p>;
+                }
+                return null;
+              })()}
             </div>
             
           </div>
