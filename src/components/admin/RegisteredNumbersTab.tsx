@@ -122,7 +122,7 @@ export default function RegisteredNumbersTab() {
     if (!confirm(`¿Eliminar ${n.owner_name}?`)) return;
     const { error } = await supabase.from("registered_numbers").delete().eq("id", n.id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { toast({ title: "Eliminado" }); fetch(); }
+    else { toast({ title: "Eliminado" }); fetchData(); }
   };
 
   const handleRenameParcel = async () => {
