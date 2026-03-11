@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
       .select("phone_number, owner_name, parcel_name");
 
     if (parcel_name) {
-      query = query.eq("parcel_name", parcel_name);
+      query = query.ilike("parcel_name", parcel_name);
     }
 
     const { data: contacts, error: dbErr } = await query;
