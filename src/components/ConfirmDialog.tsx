@@ -147,6 +147,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       parcel_name: settings.parcelName || "",
       latitude: location?.lat ?? null,
       longitude: location?.lng ?? null,
+      address: address || null,
     };
 
     const { error } = await supabase.from("alarms").insert(alarmData);
