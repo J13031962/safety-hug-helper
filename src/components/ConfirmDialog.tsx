@@ -48,19 +48,31 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       return;
     }
 
+    const resolveAddress = async (lat: number, lng: number) => {
+      const geo = await reverseGeocode(lat, lng);
+      setAddress(geo.full);
+    };
+
     // Use initialLocation if available
     if (initialLocation) {
       setLocation(initialLocation);
       setLocating(false);
+      resolveAddress(initialLocation.lat, initialLocation.lng);
     } else {
       // Try to get location
       setLocating(true);
       if (navigator.geolocation) {
+        const onSuccess = (pos: GeolocationPosition) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setLocation(loc);
+          setLocating(false);
+          resolveAddress(loc.lat, loc.lng);
+        };
         navigator.geolocation.getCurrentPosition(
-          (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+          onSuccess,
           () => {
             navigator.geolocation.getCurrentPosition(
-              (pos) => { setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setLocating(false); },
+              onSuccess,
               () => { setLocation(null); setLocating(false); },
               { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
             );
