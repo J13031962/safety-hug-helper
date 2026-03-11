@@ -1,0 +1,1 @@
+ALTER TABLE public.gps_devices ADD COLUMN IF NOT EXISTS relay_active_until timestamptz DEFAULT NULL;
