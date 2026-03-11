@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { LogOut, ArrowLeft, Headphones, MapPin, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import AlarmTimer from "@/components/AlarmTimer";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Alarm = Tables<"alarms">;
@@ -243,6 +244,7 @@ export default function OperatorDashboard() {
                         <span className={`text-xs font-medium ${isPending ? "text-emergency-panic" : isProcessing ? "text-emergency-medical" : "text-green-400"}`}>
                           {isPending ? "PENDIENTE" : isProcessing ? "EN PROCESO" : "RESUELTA"}
                         </span>
+                        <AlarmTimer createdAt={alarm.created_at} processedAt={alarm.processed_at} status={alarm.status} />
                       </div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                         <div><span className="text-muted-foreground">Remitente:</span> {alarm.sender_name || "—"}</div>
@@ -273,6 +275,7 @@ export default function OperatorDashboard() {
                           <div><span className="text-muted-foreground">Operador:</span> <span className="text-green-400 font-medium">{alarm.processed_by ? (operatorMap[alarm.processed_by] || "—") : "—"}</span></div>
                           <div><span className="text-muted-foreground">Recibido:</span> {new Date(alarm.created_at).toLocaleString("es-VE")}</div>
                           <div><span className="text-muted-foreground">Procesado:</span> {alarm.processed_at ? new Date(alarm.processed_at).toLocaleString("es-VE") : "—"}</div>
+                          <div><span className="text-muted-foreground">Tiempo de respuesta:</span> <AlarmTimer createdAt={alarm.created_at} processedAt={alarm.processed_at} status={alarm.status} /></div>
                         </div>
                       )}
                       {alarm.status !== "resolved" && <p className="text-xs text-muted-foreground mt-1">{new Date(alarm.created_at).toLocaleString("es-VE")}</p>}
