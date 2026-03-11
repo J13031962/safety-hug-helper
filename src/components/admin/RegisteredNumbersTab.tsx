@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,30 @@ export default function RegisteredNumbersTab() {
   const [editing, setEditing] = useState<RegisteredNumber | null>(null);
   const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_name: "", callmebot_apikey: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [parcelSuggestions, setParcelSuggestions] = useState<string[]>([]);
+  const [showParcelSuggestions, setShowParcelSuggestions] = useState(false);
+  const parcelRef = useRef<HTMLDivElement>(null);
+
+  const uniqueParcels = useMemo(() => {
+    const parcels = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
+    return [...new Set(parcels)].sort();
+  }, [numbers]);
+
+  const filteredParcels = useMemo(() => {
+    if (!form.parcel_name) return uniqueParcels;
+    return uniqueParcels.filter((p) => p.toLowerCase().includes(form.parcel_name.toLowerCase()));
+  }, [form.parcel_name, uniqueParcels]);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (parcelRef.current && !parcelRef.current.contains(e.target as Node)) {
+        setShowParcelSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const fetch = async () => {
     setLoading(true);
@@ -138,7 +162,30 @@ export default function RegisteredNumbersTab() {
             <div className="space-y-2"><Label>Nombre del residente</Label><Input value={form.owner_name} onChange={(e) => setForm((f) => ({ ...f, owner_name: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Teléfono WhatsApp</Label><Input value={form.phone_number} onChange={(e) => setForm((f) => ({ ...f, phone_number: e.target.value }))} placeholder="+58 412 1234567" /></div>
             <div className="space-y-2"><Label>Número de casa</Label><Input value={form.house_number} onChange={(e) => setForm((f) => ({ ...f, house_number: e.target.value }))} placeholder="Ej: A-12" /></div>
-            <div className="space-y-2"><Label>Parcela / Urbanización</Label><Input value={form.parcel_name} onChange={(e) => setForm((f) => ({ ...f, parcel_name: e.target.value }))} /></div>
+            <div className="space-y-2 relative" ref={parcelRef}>
+              <Label>Parcela / Urbanización</Label>
+              <Input
+                value={form.parcel_name}
+                onChange={(e) => { setForm((f) => ({ ...f, parcel_name: e.target.value })); setShowParcelSuggestions(true); }}
+                onFocus={() => setShowParcelSuggestions(true)}
+                placeholder="Escribe para buscar..."
+                autoComplete="off"
+              />
+              {showParcelSuggestions && filteredParcels.length > 0 && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
+                  {filteredParcels.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                      onClick={() => { setForm((f) => ({ ...f, parcel_name: p })); setShowParcelSuggestions(false); }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="space-y-2"><Label>API Key CallMeBot</Label><Input value={form.callmebot_apikey} onChange={(e) => setForm((f) => ({ ...f, callmebot_apikey: e.target.value }))} /></div>
           </div>
           <DialogFooter>
