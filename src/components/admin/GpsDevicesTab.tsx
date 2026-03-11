@@ -98,6 +98,7 @@ export default function GpsDevicesTab() {
                   <TableCell className="font-mono text-sm">{d.imei}</TableCell>
                   <TableCell>{d.sim_number || "—"}</TableCell>
                   <TableCell>{d.model || "—"}</TableCell>
+                  <TableCell>{(d as any).relay_duration ?? 30}s</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="w-4 h-4" /></Button>
