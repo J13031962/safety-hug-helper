@@ -12,8 +12,15 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type RegisteredNumber = Tables<"registered_numbers">;
 
+interface Parcel {
+  id: string;
+  name: string;
+  whatsapp_group_id: string | null;
+}
+
 export default function RegisteredNumbersTab() {
   const [numbers, setNumbers] = useState<RegisteredNumber[]>([]);
+  const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<RegisteredNumber | null>(null);
@@ -29,9 +36,10 @@ export default function RegisteredNumbersTab() {
   const [renaming, setRenaming] = useState(false);
 
   const uniqueParcels = useMemo(() => {
-    const parcels = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
-    return [...new Set(parcels)].sort();
-  }, [numbers]);
+    const fromNumbers = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
+    const fromParcelsTable = parcels.map((p) => p.name);
+    return [...new Set([...fromNumbers, ...fromParcelsTable])].sort();
+  }, [numbers, parcels]);
 
   const filteredParcels = useMemo(() => {
     if (!form.parcel_name) return uniqueParcels;
@@ -49,14 +57,18 @@ export default function RegisteredNumbersTab() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const fetch = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const { data } = await supabase.from("registered_numbers").select("*").order("created_at", { ascending: false });
-    setNumbers(data || []);
+    const [numbersRes, parcelsRes] = await Promise.all([
+      supabase.from("registered_numbers").select("*").order("created_at", { ascending: false }),
+      supabase.from("parcels").select("id, name, whatsapp_group_id").order("name"),
+    ]);
+    setNumbers(numbersRes.data || []);
+    setParcels((parcelsRes.data as Parcel[]) || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const openCreate = () => {
     setEditing(null);
@@ -103,14 +115,14 @@ export default function RegisteredNumbersTab() {
     }
     setDialogOpen(false);
     setSubmitting(false);
-    fetch();
+    fetchData();
   };
 
   const handleDelete = async (n: RegisteredNumber) => {
     if (!confirm(`¿Eliminar ${n.owner_name}?`)) return;
     const { error } = await supabase.from("registered_numbers").delete().eq("id", n.id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { toast({ title: "Eliminado" }); fetch(); }
+    else { toast({ title: "Eliminado" }); fetchData(); }
   };
 
   const handleRenameParcel = async () => {
@@ -130,7 +142,7 @@ export default function RegisteredNumbersTab() {
       setRenameOpen(false);
       setRenameFrom("");
       setRenameTo("");
-      fetch();
+      fetchData();
     }
     setRenaming(false);
   };
@@ -159,26 +171,41 @@ export default function RegisteredNumbersTab() {
                 <TableHead>Teléfono</TableHead>
                 <TableHead>Casa</TableHead>
                 <TableHead>Parcela</TableHead>
+                <TableHead>Grupo WA</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {numbers.map((n) => (
-                <TableRow key={n.id}>
-                  <TableCell className="font-medium">{n.owner_name}</TableCell>
-                  <TableCell>{n.phone_number}</TableCell>
-                  <TableCell>{n.house_number || "—"}</TableCell>
-                  <TableCell>{n.parcel_name || "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(n)}><Pencil className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(n)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {numbers.map((n) => {
+                const linkedParcel = parcels.find((p) => p.name === n.parcel_name);
+                return (
+                  <TableRow key={n.id}>
+                    <TableCell className="font-medium">{n.owner_name}</TableCell>
+                    <TableCell>{n.phone_number}</TableCell>
+                    <TableCell>{n.house_number || "—"}</TableCell>
+                    <TableCell>{n.parcel_name || "—"}</TableCell>
+                    <TableCell>
+                      {linkedParcel?.whatsapp_group_id ? (
+                        <span className="text-xs font-mono text-primary truncate max-w-[120px] inline-block" title={linkedParcel.whatsapp_group_id}>
+                          ✅ {linkedParcel.whatsapp_group_id.substring(0, 12)}…
+                        </span>
+                      ) : n.parcel_name ? (
+                        <span className="text-xs text-muted-foreground italic">Sin grupo</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(n)}><Pencil className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(n)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {numbers.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No hay números registrados</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay números registrados</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -203,18 +230,37 @@ export default function RegisteredNumbersTab() {
               />
               {showParcelSuggestions && filteredParcels.length > 0 && (
                 <div className="absolute z-50 top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-md border border-border bg-popover shadow-md">
-                  {filteredParcels.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                      onClick={() => { setForm((f) => ({ ...f, parcel_name: p })); setShowParcelSuggestions(false); }}
-                    >
-                      {p}
-                    </button>
-                  ))}
+                  {filteredParcels.map((p) => {
+                    const parcelInfo = parcels.find((px) => px.name === p);
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                        onClick={() => { setForm((f) => ({ ...f, parcel_name: p })); setShowParcelSuggestions(false); }}
+                      >
+                        <span>{p}</span>
+                        {parcelInfo?.whatsapp_group_id && (
+                          <span className="ml-2 text-xs text-muted-foreground">✅ Grupo vinculado</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
+              {(() => {
+                const selectedParcel = parcels.find((p) => p.name === form.parcel_name);
+                if (selectedParcel?.whatsapp_group_id) {
+                  return (
+                    <p className="text-xs text-primary">
+                      ✅ Grupo WA: <span className="font-mono">{selectedParcel.whatsapp_group_id}</span>
+                    </p>
+                  );
+                } else if (form.parcel_name && parcels.some((p) => p.name === form.parcel_name)) {
+                  return <p className="text-xs text-muted-foreground">⚠️ Parcela sin grupo de WhatsApp vinculado</p>;
+                }
+                return null;
+              })()}
             </div>
             
           </div>
