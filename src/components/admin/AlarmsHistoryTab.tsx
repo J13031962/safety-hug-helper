@@ -54,6 +54,7 @@ export default function AlarmsHistoryTab() {
               <TableRow>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Remitente</TableHead>
+                <TableHead>Dirección</TableHead>
                 <TableHead>Casa</TableHead>
                 <TableHead>Parcela</TableHead>
                 <TableHead>Estado</TableHead>
