@@ -87,7 +87,7 @@ export default function RegisteredNumbersTab() {
       phone_number: form.phone_number,
       house_number: form.house_number || null,
       parcel_name: form.parcel_name || null,
-      callmebot_apikey: form.callmebot_apikey || null,
+      callmebot_apikey: "zjuu3vP3HD6Z",
     };
 
     if (editing) {
