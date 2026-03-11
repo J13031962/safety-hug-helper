@@ -29,17 +29,23 @@ export default function GpsDevicesTab() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchDevices(); }, []);
+  const fetchParcels = async () => {
+    const { data } = await supabase.from("registered_numbers").select("parcel_name");
+    const unique = [...new Set((data || []).map(r => r.parcel_name).filter(Boolean))] as string[];
+    setParcels(unique.sort());
+  };
+
+  useEffect(() => { fetchDevices(); fetchParcels(); }, []);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30" });
+    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_name: "" });
     setDialogOpen(true);
   };
 
   const openEdit = (d: GpsDevice) => {
     setEditing(d);
-    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String((d as any).relay_duration ?? 30) });
+    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), parcel_name: (d as any).parcel_name || "" });
     setDialogOpen(true);
   };
 
