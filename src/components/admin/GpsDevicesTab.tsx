@@ -146,6 +146,16 @@ export default function GpsDevicesTab() {
             <div className="space-y-2"><Label>Número SIM</Label><Input value={form.sim_number} onChange={(e) => setForm((f) => ({ ...f, sim_number: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Modelo</Label><Input value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} placeholder="Ej: VT08S" /></div>
             <div className="space-y-2">
+              <Label>Parcelación</Label>
+              <Select value={form.parcel_name} onValueChange={(v) => setForm((f) => ({ ...f, parcel_name: v === "__none__" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar parcelación" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sin asignar</SelectItem>
+                  {parcels.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Duración de activación (segundos)</Label>
               <Input type="number" min="5" max="300" value={form.relay_duration} onChange={(e) => setForm((f) => ({ ...f, relay_duration: e.target.value }))} placeholder="30" />
               <p className="text-xs text-muted-foreground">Tiempo que el relay permanece activo antes de restaurarse automáticamente.</p>
