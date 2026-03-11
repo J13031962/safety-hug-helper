@@ -108,7 +108,7 @@ export default function GpsDevicesTab() {
                 </TableRow>
               ))}
               {devices.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
