@@ -160,7 +160,7 @@ export default function ParcelsTab() {
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>
                     {p.whatsapp_group_id ? (
-                      <span className="text-xs font-mono text-emerald-400">{p.whatsapp_group_id}</span>
+                      <span className="text-xs font-mono text-primary">{p.whatsapp_group_id}</span>
                     ) : (
                       <span className="text-xs text-muted-foreground italic">Sin grupo</span>
                     )}
