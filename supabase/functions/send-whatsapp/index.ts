@@ -81,11 +81,12 @@ Deno.serve(async (req) => {
       return phone.startsWith("+") ? phone : `+${digits}`;
     };
 
-    // Send to all contacts via TextMeBot sequentially (API may rate-limit parallel calls)
+    // Send to all contacts via TextMeBot sequentially (TextMeBot limit: 1 message each 5s)
     const results = [];
-    for (const contact of contacts) {
+    for (const [index, contact] of contacts.entries()) {
+      const recipient = normalize(contact.phone_number);
+
       try {
-        const recipient = normalize(contact.phone_number);
         const formData = new URLSearchParams();
         formData.append("recipient", recipient);
         formData.append("apikey", TEXTMEBOT_API_KEY);
@@ -96,22 +97,35 @@ Deno.serve(async (req) => {
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: formData.toString(),
         });
+
         const text = await res.text();
+        const ok = res.status >= 200 && res.status < 300;
         console.log(`TextMeBot -> ${recipient}: ${res.status} ${text.substring(0, 200)}`);
-        results.push({ status: "fulfilled", phone: recipient, httpStatus: res.status });
+
+        results.push({
+          phone: recipient,
+          ok,
+          httpStatus: res.status,
+          providerResponse: text.substring(0, 200),
+        });
       } catch (err) {
-        console.error(`TextMeBot -> ${contact.phone_number}: FAILED`, err.message);
-        results.push({ status: "rejected", phone: contact.phone_number });
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        console.error(`TextMeBot -> ${recipient}: FAILED ${errorMessage}`);
+        results.push({ phone: recipient, ok: false, httpStatus: 0, providerResponse: errorMessage });
       }
-      // Small delay between sends to avoid rate limiting
-      await new Promise((r) => setTimeout(r, 1500));
+
+      // 6s delay to stay above provider rate limit (1 message / 5 seconds)
+      if (index < contacts.length - 1) {
+        await new Promise((r) => setTimeout(r, 6000));
+      }
     }
 
-    const sent = results.filter((r) => r.status === "fulfilled").length;
-    const failed = results.filter((r) => r.status === "rejected").length;
+    const sent = results.filter((r) => r.ok).length;
+    const failed = results.filter((r) => !r.ok).length;
+    const firstError = results.find((r) => !r.ok)?.providerResponse ?? null;
 
     return new Response(
-      JSON.stringify({ success: true, sent, failed, total: contacts.length }),
+      JSON.stringify({ success: failed === 0, sent, failed, total: contacts.length, first_error: firstError }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
