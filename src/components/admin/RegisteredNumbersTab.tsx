@@ -71,7 +71,6 @@ export default function RegisteredNumbersTab() {
       phone_number: n.phone_number,
       house_number: n.house_number || "",
       parcel_name: n.parcel_name || "",
-      callmebot_apikey: n.callmebot_apikey || "",
     });
     setDialogOpen(true);
   };
