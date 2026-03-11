@@ -17,7 +17,7 @@ export default function RegisteredNumbersTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<RegisteredNumber | null>(null);
-  const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_name: "", callmebot_apikey: "" });
+  const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_name: "" });
   const [submitting, setSubmitting] = useState(false);
   const [showParcelSuggestions, setShowParcelSuggestions] = useState(false);
   const parcelRef = useRef<HTMLDivElement>(null);
@@ -60,7 +60,7 @@ export default function RegisteredNumbersTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ owner_name: "", phone_number: "", house_number: "", parcel_name: "", callmebot_apikey: "" });
+    setForm({ owner_name: "", phone_number: "", house_number: "", parcel_name: "" });
     setDialogOpen(true);
   };
 
@@ -71,7 +71,6 @@ export default function RegisteredNumbersTab() {
       phone_number: n.phone_number,
       house_number: n.house_number || "",
       parcel_name: n.parcel_name || "",
-      callmebot_apikey: n.callmebot_apikey || "",
     });
     setDialogOpen(true);
   };
@@ -87,7 +86,6 @@ export default function RegisteredNumbersTab() {
       phone_number: form.phone_number,
       house_number: form.house_number || null,
       parcel_name: form.parcel_name || null,
-      callmebot_apikey: "zjuu3vP3HD6Z",
     };
 
     if (editing) {
@@ -218,7 +216,7 @@ export default function RegisteredNumbersTab() {
                 </div>
               )}
             </div>
-            <div className="space-y-2"><Label>API Key CallMeBot</Label><Input value="zjuu3vP3HD6Z" readOnly className="bg-muted cursor-not-allowed" /></div>
+            
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
