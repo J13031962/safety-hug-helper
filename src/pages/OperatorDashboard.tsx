@@ -74,54 +74,18 @@ export default function OperatorDashboard() {
             disaster: "¡Alerta de desastre!",
           };
           try {
-            const ctx = new AudioContext();
-            const masterGain = ctx.createGain();
-            masterGain.gain.value = 1;
-            masterGain.connect(ctx.destination);
-
-            // Siren: two oscillators sweeping frequencies
-            const osc1 = ctx.createOscillator();
-            const osc2 = ctx.createOscillator();
-            const gain1 = ctx.createGain();
-            const gain2 = ctx.createGain();
-            osc1.type = "sawtooth";
-            osc2.type = "square";
-            gain1.gain.value = 0.6;
-            gain2.gain.value = 0.3;
-            osc1.connect(gain1);
-            osc2.connect(gain2);
-            gain1.connect(masterGain);
-            gain2.connect(masterGain);
-
-            // Siren sweep: 600Hz ↔ 1200Hz over 0.6s cycles for 3 seconds
-            const now = ctx.currentTime;
-            const sirenDuration = 3;
-            const cycles = 5;
-            for (let i = 0; i < cycles; i++) {
-              const t = now + (i * sirenDuration) / cycles;
-              const half = sirenDuration / cycles / 2;
-              osc1.frequency.setValueAtTime(600, t);
-              osc1.frequency.linearRampToValueAtTime(1200, t + half);
-              osc1.frequency.linearRampToValueAtTime(600, t + half * 2);
-              osc2.frequency.setValueAtTime(400, t);
-              osc2.frequency.linearRampToValueAtTime(800, t + half);
-              osc2.frequency.linearRampToValueAtTime(400, t + half * 2);
-            }
-
-            osc1.start(now);
-            osc2.start(now);
-            osc1.stop(now + sirenDuration);
-            osc2.stop(now + sirenDuration);
-
-            // After siren, speak the alert type
+            const siren = new Audio("/sounds/police-siren.mp3");
+            siren.volume = 1;
+            siren.play().catch(() => {});
+            // After 4s speak the alert type
             setTimeout(() => {
-              ctx.close();
+              siren.pause();
               const msg = new SpeechSynthesisUtterance(voiceLabels[newAlarm.alarm_type] || "¡Nueva alerta!");
               msg.lang = "es-ES";
               msg.rate = 0.9;
               msg.volume = 1;
               speechSynthesis.speak(msg);
-            }, sirenDuration * 1000 + 200);
+            }, 4000);
           } catch {}
         } else if (payload.eventType === "UPDATE") {
           setAlarms((prev) => prev.map((a) => (a.id === (payload.new as Alarm).id ? (payload.new as Alarm) : a)));
