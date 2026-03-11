@@ -60,12 +60,15 @@ export default function AdminPanel() {
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 py-6">
         <Tabs defaultValue="users">
-          <TabsList className="grid w-full grid-cols-6 mb-6">
+          <TabsList className="grid w-full grid-cols-7 mb-6">
             <TabsTrigger value="users" className="gap-1 text-xs sm:text-sm">
               <Users className="w-4 h-4" /> <span className="hidden sm:inline">Usuarios</span>
             </TabsTrigger>
             <TabsTrigger value="numbers" className="gap-1 text-xs sm:text-sm">
               <Phone className="w-4 h-4" /> <span className="hidden sm:inline">WhatsApp</span>
+            </TabsTrigger>
+            <TabsTrigger value="parcels" className="gap-1 text-xs sm:text-sm">
+              <MapPin className="w-4 h-4" /> <span className="hidden sm:inline">Parcelas</span>
             </TabsTrigger>
             <TabsTrigger value="gps" className="gap-1 text-xs sm:text-sm">
               <Radio className="w-4 h-4" /> <span className="hidden sm:inline">GPS</span>
@@ -83,6 +86,7 @@ export default function AdminPanel() {
 
           <TabsContent value="users"><UsersTab /></TabsContent>
           <TabsContent value="numbers"><RegisteredNumbersTab /></TabsContent>
+          <TabsContent value="parcels"><ParcelsTab /></TabsContent>
           <TabsContent value="gps"><GpsDevicesTab /></TabsContent>
           <TabsContent value="alarms"><AlarmsHistoryTab /></TabsContent>
           <TabsContent value="reports"><ReportsTab /></TabsContent>
