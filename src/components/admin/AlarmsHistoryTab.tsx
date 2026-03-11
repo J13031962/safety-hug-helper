@@ -87,7 +87,7 @@ export default function AlarmsHistoryTab() {
                 );
               })}
               {alarms.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay alarmas</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay alarmas</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
