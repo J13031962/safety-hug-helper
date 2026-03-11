@@ -57,14 +57,18 @@ export default function RegisteredNumbersTab() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const fetch = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const { data } = await supabase.from("registered_numbers").select("*").order("created_at", { ascending: false });
-    setNumbers(data || []);
+    const [numbersRes, parcelsRes] = await Promise.all([
+      supabase.from("registered_numbers").select("*").order("created_at", { ascending: false }),
+      supabase.from("parcels").select("id, name, whatsapp_group_id").order("name"),
+    ]);
+    setNumbers(numbersRes.data || []);
+    setParcels((parcelsRes.data as Parcel[]) || []);
     setLoading(false);
   };
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const openCreate = () => {
     setEditing(null);
