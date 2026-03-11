@@ -33,6 +33,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
   const [countdown, setCountdown] = useState(5);
   const [state, setState] = useState<DialogState>("confirm");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [whatsappWarning, setWhatsappWarning] = useState<string | null>(null);
 
