@@ -152,6 +152,18 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       setWhatsappWarning("No se enviaron mensajes WhatsApp. Configura las API keys de CallMeBot en los números registrados.");
     }
 
+    // Try GPS siren/relay activation
+    try {
+      const { error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
+        body: { alarm_type: type },
+      });
+      if (gpsErr) {
+        console.warn("[GPS] Error activando dispositivos:", gpsErr);
+      }
+    } catch (gpsEx) {
+      console.warn("[GPS] Error activando dispositivos:", gpsEx);
+    }
+
     setState("success");
 
     // Auto-close after 4 seconds
