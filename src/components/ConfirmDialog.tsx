@@ -170,11 +170,16 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
 
     // Try GPS siren/relay activation
     try {
-      const { error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
-        body: { alarm_type: type },
+      const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
+        body: { alarm_type: type, parcel_name: settings.parcelName || "" },
       });
       if (gpsErr) {
         console.warn("[GPS] Error activando dispositivos:", gpsErr);
+      } else if (gpsData?.results) {
+        const extended = gpsData.results.filter((r: any) => r.action === "extended");
+        if (extended.length > 0 && gpsData.results.length === extended.length) {
+          toast({ title: "🔊 Sirena ya activa", description: "La sirena ya está sonando. Se extendió el tiempo." });
+        }
       }
     } catch (gpsEx) {
       console.warn("[GPS] Error activando dispositivos:", gpsEx);

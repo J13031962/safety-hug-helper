@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Radio, Zap, ZapOff, Moon } from "lucide-react";
+import { Plus, Pencil, Trash2, Radio } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type GpsDevice = Tables<"gps_devices">;
@@ -21,7 +21,6 @@ export default function GpsDevicesTab() {
   const [editing, setEditing] = useState<GpsDevice | null>(null);
   const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_name: "" });
   const [submitting, setSubmitting] = useState(false);
-  const [sendingCommand, setSendingCommand] = useState<string | null>(null);
 
   const fetchDevices = async () => {
     setLoading(true);
@@ -79,36 +78,6 @@ export default function GpsDevicesTab() {
     else { toast({ title: "Eliminado" }); fetchDevices(); }
   };
 
-  const sendCommand = async (imei: string, action: "relay-on" | "relay-off" | "nosleep") => {
-    const cmdKey = `${imei}-${action}`;
-    setSendingCommand(cmdKey);
-    try {
-      const { data, error } = await supabase.functions.invoke("send-gps-command", {
-        body: { imei, action },
-      });
-      if (error) {
-        toast({ title: "Error", description: "No se pudo enviar el comando", variant: "destructive" });
-      } else if (data?.success) {
-        const labels: Record<string, string> = {
-          "relay-on": "⚡ Corte de energía enviado",
-          "relay-off": "🔌 Restauración de energía enviada",
-          "nosleep": "😴 Modo siempre activo enviado",
-        };
-        toast({ title: labels[action] || "Comando enviado" });
-      } else {
-        toast({ title: "Error", description: data?.error || "El comando falló", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Error de conexión", variant: "destructive" });
-    }
-    setSendingCommand(null);
-  };
-
-  const isRelayActive = (d: GpsDevice) => {
-    if (!d.relay_active_until) return false;
-    return new Date(d.relay_active_until) > new Date();
-  };
-
   return (
     <Card className="border-border">
       <CardHeader className="pb-4 space-y-3">
@@ -135,11 +104,7 @@ export default function GpsDevicesTab() {
             <span className="text-muted-foreground">Protocolo:</span>
             <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">TCP</code>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Comandos:</span>
-            <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">poweroff# poweron# nosleep#</code>
-          </div>
-          <p className="w-full text-xs text-muted-foreground">Configura estos datos en cada dispositivo Protrack VT08F para conectarlo al servidor.</p>
+          <p className="w-full text-xs text-muted-foreground">Al activarse cualquier alarma, se envía automáticamente el comando de corte de energía (poweroff#) a los dispositivos de la parcela. Tras la duración configurada, se restaura automáticamente (poweron#).</p>
         </div>
       </CardHeader>
       <CardContent>
@@ -154,80 +119,27 @@ export default function GpsDevicesTab() {
                 <TableHead>Modelo</TableHead>
                 <TableHead>Parcelación</TableHead>
                 <TableHead>Duración Relay</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Comandos</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {devices.map((d) => {
-                const relayActive = isRelayActive(d);
-                return (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-mono text-sm">{d.imei}</TableCell>
-                    <TableCell>{d.sim_number || "—"}</TableCell>
-                    <TableCell>{d.model || "—"}</TableCell>
-                    <TableCell>{d.parcel_name || "—"}</TableCell>
-                    <TableCell>{d.relay_duration ?? 30}s</TableCell>
-                    <TableCell>
-                      {relayActive ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emergency-panic">
-                          <ZapOff className="w-3 h-3" /> Cortado
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
-                          <Zap className="w-3 h-3" /> Normal
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs h-7 px-2 border-emergency-panic/50 text-emergency-panic hover:bg-emergency-panic/10"
-                          disabled={sendingCommand === `${d.imei}-relay-on`}
-                          onClick={() => sendCommand(d.imei, "relay-on")}
-                          title="Cortar energía (poweroff#)"
-                        >
-                          <ZapOff className="w-3 h-3 mr-1" />
-                          Cortar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs h-7 px-2 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
-                          disabled={sendingCommand === `${d.imei}-relay-off`}
-                          onClick={() => sendCommand(d.imei, "relay-off")}
-                          title="Restaurar energía (poweron#)"
-                        >
-                          <Zap className="w-3 h-3 mr-1" />
-                          Restaurar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs h-7 px-2 border-emergency-disaster/50 text-emergency-disaster hover:bg-emergency-disaster/10"
-                          disabled={sendingCommand === `${d.imei}-nosleep`}
-                          onClick={() => sendCommand(d.imei, "nosleep")}
-                          title="Modo siempre activo (nosleep#)"
-                        >
-                          <Moon className="w-3 h-3 mr-1" />
-                          NoSleep
-                        </Button>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(d)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {devices.map((d) => (
+                <TableRow key={d.id}>
+                  <TableCell className="font-mono text-sm">{d.imei}</TableCell>
+                  <TableCell>{d.sim_number || "—"}</TableCell>
+                  <TableCell>{d.model || "—"}</TableCell>
+                  <TableCell>{d.parcel_name || "—"}</TableCell>
+                  <TableCell>{d.relay_duration ?? 30}s</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(d)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
               {devices.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -254,7 +166,7 @@ export default function GpsDevicesTab() {
             <div className="space-y-2">
               <Label>Duración de activación (segundos)</Label>
               <Input type="number" min="5" max="300" value={form.relay_duration} onChange={(e) => setForm((f) => ({ ...f, relay_duration: e.target.value }))} placeholder="30" />
-              <p className="text-xs text-muted-foreground">Tiempo que el relay permanece activo antes de restaurarse automáticamente.</p>
+              <p className="text-xs text-muted-foreground">Tiempo que la sirena suena antes de apagarse automáticamente.</p>
             </div>
           </div>
           <DialogFooter>
