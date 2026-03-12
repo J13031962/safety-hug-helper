@@ -271,28 +271,54 @@ export default function OperatorDashboard() {
                   onChange={(e) => setFilterOperator(e.target.value)}
                   className="h-8 text-xs"
                 />
-                <div className="flex gap-2">
                 <Input
                   placeholder="Parcela..."
                   value={filterParcel}
                   onChange={(e) => setFilterParcel(e.target.value)}
                   className="h-8 text-xs"
                 />
-                <Input
-                    type="date"
-                    value={filterDateFrom}
-                    onChange={(e) => setFilterDateFrom(e.target.value)}
-                    className="h-8 text-xs"
-                    title="Desde"
-                  />
-                  <Input
-                    type="date"
-                    value={filterDateTo}
-                    onChange={(e) => setFilterDateTo(e.target.value)}
-                    className="h-8 text-xs"
-                    title="Hasta"
-                  />
-                </div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5 justify-start font-normal">
+                      <CalendarDays className="w-3.5 h-3.5" />
+                      {filterDateFrom || filterDateTo
+                        ? `${filterDateFrom ? new Date(filterDateFrom + "T12:00").toLocaleDateString("es-VE", { day: "2-digit", month: "2-digit" }) : "..."} — ${filterDateTo ? new Date(filterDateTo + "T12:00").toLocaleDateString("es-VE", { day: "2-digit", month: "2-digit" }) : "..."}`
+                        : "Fechas"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-4" align="end">
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Desde</Label>
+                        <Input
+                          type="date"
+                          value={filterDateFrom}
+                          onChange={(e) => setFilterDateFrom(e.target.value)}
+                          className="h-8 text-xs mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Hasta</Label>
+                        <Input
+                          type="date"
+                          value={filterDateTo}
+                          onChange={(e) => setFilterDateTo(e.target.value)}
+                          className="h-8 text-xs mt-1"
+                        />
+                      </div>
+                      {(filterDateFrom || filterDateTo) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full h-7 text-xs"
+                          onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                        >
+                          Limpiar fechas
+                        </Button>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </CardContent>
           </Card>
