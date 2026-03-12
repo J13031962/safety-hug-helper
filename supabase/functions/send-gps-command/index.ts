@@ -8,8 +8,9 @@ const corsHeaders = {
 const GPS_API_BASE = "http://192.99.16.163:3000";
 const GPS_API_TOKEN = "protrack2026";
 
-// ── Send command via REST API ──
-async function sendRelayCommand(imei: string, action: "power-off" | "power-on"): Promise<{ success: boolean; response?: string; error?: string }> {
+type DeviceAction = "power-off" | "power-on" | "nosleep";
+
+async function sendDeviceCommand(imei: string, action: DeviceAction): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
     const url = `${GPS_API_BASE}/api/device/${imei}/${action}`;
     console.log(`[GPS-API] POST ${url}`);
@@ -36,7 +37,6 @@ async function sendRelayCommand(imei: string, action: "power-off" | "power-on"):
   }
 }
 
-// ── Main handler ──
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -46,9 +46,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { alarm_type, imei, action } = body;
 
-    // Manual actions from admin panel
+    // ── Manual actions from admin panel ──
     if (action === "relay-on" && imei) {
-      const result = await sendRelayCommand(imei, "power-off");
+      const result = await sendDeviceCommand(imei, "power-off");
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -56,21 +56,34 @@ Deno.serve(async (req) => {
     }
 
     if (action === "relay-off" && imei) {
-      const result = await sendRelayCommand(imei, "power-on");
+      const result = await sendDeviceCommand(imei, "power-on");
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Alarm trigger: activate relay on all devices
+    if (action === "nosleep" && imei) {
+      const result = await sendDeviceCommand(imei, "nosleep");
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Alarm trigger: activate relay on matching devices ──
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: devices } = await supabase
-      .from("gps_devices")
-      .select("imei, relay_duration, relay_active_until");
+    // Get alarm's parcel to only target devices in that parcel
+    const alarmParcel = body.parcel_name || null;
+
+    const query = supabase.from("gps_devices").select("imei, relay_duration, relay_active_until, parcel_name");
+    
+    const { data: devices } = alarmParcel 
+      ? await query.eq("parcel_name", alarmParcel)
+      : await query;
 
     const targetDevices = (devices || []).filter((d: any) =>
       imei ? d.imei === imei : true
@@ -79,7 +92,7 @@ Deno.serve(async (req) => {
     if (targetDevices.length === 0) {
       return new Response(JSON.stringify({
         success: false,
-        message: "No hay dispositivos GPS registrados",
+        message: "No hay dispositivos GPS registrados para esta parcela",
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -107,9 +120,9 @@ Deno.serve(async (req) => {
           action: "extended", active_until: newActiveUntil.toISOString(),
         });
       } else {
-        console.log(`[GPS] Activating relay on ${device.imei} for ${duration}s`);
+        console.log(`[GPS] Activating relay (power-off) on ${device.imei} for ${duration}s`);
         try {
-          const result = await sendRelayCommand(device.imei, "power-off");
+          const result = await sendDeviceCommand(device.imei, "power-off");
           results.push({
             imei: device.imei, success: result.success, relay_duration: duration,
             action: "activated", active_until: newActiveUntil.toISOString(),
@@ -123,7 +136,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Schedule relay restore
+      // Schedule power restore
       restorePromises.push((async () => {
         const waitMs = newActiveUntil.getTime() - Date.now();
         if (waitMs > 0) {
@@ -144,7 +157,7 @@ Deno.serve(async (req) => {
         }
 
         console.log(`[GPS] Restoring power on ${device.imei}`);
-        await sendRelayCommand(device.imei, "power-on");
+        await sendDeviceCommand(device.imei, "power-on");
 
         await supabase
           .from("gps_devices")
