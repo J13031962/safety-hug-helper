@@ -1,23 +1,25 @@
-Custom GPS server configuration and TCP command details
+Custom GPS server configuration and API details
 
 ## Server
 - IP: 192.99.16.163
-- Port 8821/TCP - GPS devices connect here
-- Port 3000/TCP - App connects here
+- Port 8821/TCP - GPS devices connect here (internal)
+- Port 3000/TCP - REST API for app commands
 - Port 8080/TCP - WebSocket for realtime
-- All ports open by default
-- Server emulates GPS signals (custom server, not Protrack365)
+- Auth: Bearer protrack2026
+
+## REST API Endpoints
+- POST /api/device/{imei}/power-off → Cut power (activate relay)
+- POST /api/device/{imei}/power-on → Restore power (deactivate relay)
+- Headers: Authorization: Bearer protrack2026
+
+## Flow
+1. App → HTTP POST to API (port 3000)
+2. API server → finds device socket → builds 0x80 binary packet
+3. API server → writes packet via TCP to device
+4. Device responds with 0x21 packet ("OK" or "ERROR")
 
 ## Device
 - Model: VT08F
-- Protocol: GT06 binary protocol (0x78 0x78 start bits)
-
-## Command Protocol (0x80 - Online Command)
-- Packet: [0x78 0x78] [length] [0x80] [contentLen:4B] [serverFlag:4B] [command:ASCII] [lang:2B] [serial:2B] [CRC16:2B] [0x0D 0x0A]
-- CRC-16/ITU (X.25): poly=0x1021, init=0xFFFF, xorOut=0xFFFF
-- CRC calculated from packet length to serial number (inclusive)
-
-## Relay Commands
-- `poweroff#` = CUT power (activate relay / siren)
-- `poweron#` = RESTORE power (deactivate relay)
-- Commands are ASCII, must end with #
+- IMEI: 355468592594287
+- Protocol: GT06 binary (0x78 0x78 start)
+- Commands: poweroff# / poweron# (ASCII in 0x80 packet)

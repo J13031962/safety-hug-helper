@@ -5,130 +5,35 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GPS_SERVER_IP = "192.99.16.163";
-const GPS_SERVER_PORT = 8821;
+const GPS_API_BASE = "http://192.99.16.163:3000";
+const GPS_API_TOKEN = "protrack2026";
 
-// ── CRC-16/ITU (X.25) ──
-function crc16itu(data: Uint8Array): number {
-  let crc = 0xFFFF;
-  for (const byte of data) {
-    crc ^= byte << 8;
-    for (let i = 0; i < 8; i++) {
-      crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
-      crc &= 0xFFFF;
-    }
-  }
-  return crc ^ 0xFFFF;
-}
-
-// ── Build protocol 0x80 command packet (matches server's buildOnlineCommand) ──
-function buildCommandPacket(command: string, serialNumber = 1, serverFlag = 0): Uint8Array {
-  const commandBytes = new TextEncoder().encode(command);
-
-  // contentLength = Flag(1) + ServerFlag(4) + Command(M)
-  const contentLength = 1 + 4 + commandBytes.length;
-
-  // packetLength = Protocol(1) + Content + Serial(2) + CRC(2)
-  const packetLength = 1 + contentLength + 2 + 2;
-
-  // Total buffer: Start(2) + PacketLen(1) + Protocol(1) + ContentLen(1) + ServerFlag(4) + Command(M) + Serial(2) + CRC(2) + Stop(2)
-  const totalSize = 2 + 1 + 1 + 1 + 4 + commandBytes.length + 2 + 2 + 2;
-  const packet = new Uint8Array(totalSize);
-  let offset = 0;
-
-  // Start bits
-  packet[offset++] = 0x78;
-  packet[offset++] = 0x78;
-
-  // Packet length
-  packet[offset++] = packetLength;
-
-  // Protocol number (0x80 = online command)
-  packet[offset++] = 0x80;
-
-  // Content length (1 byte)
-  packet[offset++] = contentLength;
-
-  // Server flag (4 bytes, big-endian)
-  packet[offset++] = (serverFlag >> 24) & 0xFF;
-  packet[offset++] = (serverFlag >> 16) & 0xFF;
-  packet[offset++] = (serverFlag >> 8) & 0xFF;
-  packet[offset++] = serverFlag & 0xFF;
-
-  // Command content (ASCII)
-  packet.set(commandBytes, offset);
-  offset += commandBytes.length;
-
-  // Serial number (2 bytes, big-endian)
-  packet[offset++] = (serialNumber >> 8) & 0xFF;
-  packet[offset++] = serialNumber & 0xFF;
-
-  // CRC-16/ITU: from packet length to serial number (inclusive)
-  const crcData = packet.slice(2, offset);
-  const crc = crc16itu(crcData);
-  packet[offset++] = (crc >> 8) & 0xFF;
-  packet[offset++] = crc & 0xFF;
-
-  // Stop bits
-  packet[offset++] = 0x0D;
-  packet[offset++] = 0x0A;
-
-  return packet;
-}
-
-// ── Send binary command via TCP ──
-async function sendGpsCommand(command: string): Promise<{ success: boolean; response?: string; error?: string }> {
+// ── Send command via REST API ──
+async function sendRelayCommand(imei: string, action: "power-off" | "power-on"): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
-    console.log(`[GPS-TCP] Connecting to ${GPS_SERVER_IP}:${GPS_SERVER_PORT}...`);
-    const conn = await Deno.connect({ hostname: GPS_SERVER_IP, port: GPS_SERVER_PORT });
+    const url = `${GPS_API_BASE}/api/device/${imei}/${action}`;
+    console.log(`[GPS-API] POST ${url}`);
 
-    const serialNumber = Math.floor(Math.random() * 0xFFFF);
-    const packet = buildCommandPacket(command, serialNumber);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GPS_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-    console.log(`[GPS-TCP] Sending command "${command}" (${packet.length} bytes, serial=${serialNumber})`);
-    console.log(`[GPS-TCP] Packet hex: ${Array.from(packet).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+    const body = await res.text();
+    console.log(`[GPS-API] Status: ${res.status}, Body: ${body}`);
 
-    await conn.write(packet);
-
-    // Read response with timeout
-    const buffer = new Uint8Array(1024);
-    let response = "";
-
-    try {
-      const timeoutId = setTimeout(() => {
-        try { conn.close(); } catch { /* ignore */ }
-      }, 5000);
-
-      const bytesRead = await conn.read(buffer);
-      clearTimeout(timeoutId);
-
-      if (bytesRead !== null) {
-        const responseHex = Array.from(buffer.subarray(0, bytesRead)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-        response = `Received ${bytesRead} bytes: ${responseHex}`;
-        console.log(`[GPS-TCP] ${response}`);
-      }
-    } catch (readErr) {
-      console.log(`[GPS-TCP] Read timeout or error (command may still have been sent):`, readErr);
+    if (!res.ok) {
+      return { success: false, error: `HTTP ${res.status}: ${body}` };
     }
 
-    try { conn.close(); } catch { /* ignore */ }
-
-    return { success: true, response: response || "Command sent (no response)" };
+    return { success: true, response: body };
   } catch (err) {
-    console.error(`[GPS-TCP] Connection error:`, err);
-    return { success: false, error: err instanceof Error ? err.message : "TCP connection failed" };
+    console.error(`[GPS-API] Error:`, err);
+    return { success: false, error: err instanceof Error ? err.message : "API request failed" };
   }
-}
-
-// ── Relay control ──
-async function activateRelay(imei: string): Promise<{ success: boolean; response?: string; error?: string }> {
-  console.log(`[GPS] Cutting power for IMEI: ${imei} (poweroff#)`);
-  return await sendGpsCommand("poweroff#");
-}
-
-async function deactivateRelay(imei: string): Promise<{ success: boolean; response?: string; error?: string }> {
-  console.log(`[GPS] Restoring power for IMEI: ${imei} (poweron#)`);
-  return await sendGpsCommand("poweron#");
 }
 
 // ── Main handler ──
@@ -143,7 +48,7 @@ Deno.serve(async (req) => {
 
     // Manual actions from admin panel
     if (action === "relay-on" && imei) {
-      const result = await activateRelay(imei);
+      const result = await sendRelayCommand(imei, "power-off");
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -151,7 +56,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "relay-off" && imei) {
-      const result = await deactivateRelay(imei);
+      const result = await sendRelayCommand(imei, "power-on");
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -196,43 +101,33 @@ Deno.serve(async (req) => {
         .eq("imei", device.imei);
 
       if (isRelayActive) {
-        console.log(`[GPS] Relay already active on ${device.imei}, extended to ${newActiveUntil.toISOString()}`);
+        console.log(`[GPS] Relay already active on ${device.imei}, extended`);
         results.push({
-          imei: device.imei,
-          success: true,
-          relay_duration: duration,
-          action: "extended",
-          active_until: newActiveUntil.toISOString(),
+          imei: device.imei, success: true, relay_duration: duration,
+          action: "extended", active_until: newActiveUntil.toISOString(),
         });
       } else {
         console.log(`[GPS] Activating relay on ${device.imei} for ${duration}s`);
         try {
-          const result = await activateRelay(device.imei);
+          const result = await sendRelayCommand(device.imei, "power-off");
           results.push({
-            imei: device.imei,
-            success: result.success,
-            relay_duration: duration,
-            action: "activated",
-            active_until: newActiveUntil.toISOString(),
-            tcp_response: result.response,
+            imei: device.imei, success: result.success, relay_duration: duration,
+            action: "activated", active_until: newActiveUntil.toISOString(),
+            api_response: result.response,
           });
         } catch (err) {
-          console.error(`[GPS] Error activating ${device.imei}:`, err);
           results.push({
-            imei: device.imei,
-            success: false,
-            relay_duration: duration,
-            action: "error",
-            error: err instanceof Error ? err.message : "Error desconocido",
+            imei: device.imei, success: false, relay_duration: duration,
+            action: "error", error: err instanceof Error ? err.message : "Error desconocido",
           });
         }
       }
 
-      // Schedule relay deactivation
+      // Schedule relay restore
       restorePromises.push((async () => {
         const waitMs = newActiveUntil.getTime() - Date.now();
         if (waitMs > 0) {
-          console.log(`[GPS] Scheduling relay-off for ${device.imei} in ${Math.round(waitMs / 1000)}s`);
+          console.log(`[GPS] Scheduling power-on for ${device.imei} in ${Math.round(waitMs / 1000)}s`);
           await new Promise((resolve) => setTimeout(resolve, waitMs));
         }
 
@@ -242,17 +137,14 @@ Deno.serve(async (req) => {
           .eq("imei", device.imei)
           .single();
 
-        const currentUntil = current?.relay_active_until
-          ? new Date(current.relay_active_until)
-          : null;
-
+        const currentUntil = current?.relay_active_until ? new Date(current.relay_active_until) : null;
         if (currentUntil && currentUntil > new Date()) {
           console.log(`[GPS] Restore skipped for ${device.imei}: timer extended`);
           return;
         }
 
-        console.log(`[GPS] Deactivating relay on ${device.imei}`);
-        await deactivateRelay(device.imei);
+        console.log(`[GPS] Restoring power on ${device.imei}`);
+        await sendRelayCommand(device.imei, "power-on");
 
         await supabase
           .from("gps_devices")
