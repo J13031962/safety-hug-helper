@@ -95,17 +95,14 @@ const IndexContent = () => {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-start px-4 pt-10 pb-6 gap-6">
+      <main className="flex-1 flex flex-col items-center justify-start px-4 pt-10 pb-6 gap-4">
         <div className="w-full max-w-xs px-4">
           <img src={smartsosLogo} alt="SmartSOS Logo" className="w-full h-auto object-contain" />
         </div>
         <p className="text-muted-foreground text-sm">Presiona un botón para enviar alerta de emergencia</p>
         <EmergencyGrid onSelect={handleSelect} />
+        <p className="text-xs text-muted-foreground mt-4">Las alertas se envían vía WhatsApp y activan las sirenas</p>
       </main>
-
-      <footer className="py-5 text-center">
-        <p className="text-xs text-muted-foreground">Las alertas se envían vía WhatsApp y activan las sirenas</p>
-      </footer>
 
       <ConfirmDialog
         open={dialogOpen}
