@@ -35,6 +35,7 @@ export default function OperatorDashboard() {
   const [filterOperator, setFilterOperator] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterParcel, setFilterParcel] = useState("");
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
@@ -157,6 +158,9 @@ export default function OperatorDashboard() {
           return opName?.toLowerCase().includes(filterOperator.toLowerCase());
         });
       }
+      if (filterParcel.trim()) {
+        result = result.filter((a) => a.parcel_name?.toLowerCase().includes(filterParcel.toLowerCase()));
+      }
       if (filterDateFrom) {
         const from = new Date(filterDateFrom);
         result = result.filter((a) => new Date(a.created_at) >= from);
@@ -245,7 +249,7 @@ export default function OperatorDashboard() {
               <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
                 <Search className="w-4 h-4" /> Filtros
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <Input
                   placeholder="Remitente..."
                   value={filterSender}
@@ -265,7 +269,13 @@ export default function OperatorDashboard() {
                   className="h-8 text-xs"
                 />
                 <div className="flex gap-2">
-                  <Input
+                <Input
+                  placeholder="Parcela..."
+                  value={filterParcel}
+                  onChange={(e) => setFilterParcel(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <Input
                     type="date"
                     value={filterDateFrom}
                     onChange={(e) => setFilterDateFrom(e.target.value)}
