@@ -103,8 +103,8 @@ const IndexContent = () => {
         <EmergencyGrid onSelect={handleSelect} />
       </main>
 
-      <footer className="py-3 text-center">
-        <p className="text-xs text-muted-foreground">Las alertas se envían vía WhatsApp y activan la sirena GPS VT08</p>
+      <footer className="py-5 text-center">
+        <p className="text-xs text-muted-foreground">Las alertas se envían vía WhatsApp y activan las sirenas</p>
       </footer>
 
       <ConfirmDialog
