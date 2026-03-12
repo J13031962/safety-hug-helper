@@ -35,6 +35,7 @@ export default function OperatorDashboard() {
   const [filterOperator, setFilterOperator] = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
+  const [filterParcel, setFilterParcel] = useState("");
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
