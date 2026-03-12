@@ -46,23 +46,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { alarm_type, imei, action } = body;
 
-    // ── Manual actions from admin panel ──
-    if (action === "relay-on" && imei) {
-      const result = await sendDeviceCommand(imei, "power-off");
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (action === "relay-off" && imei) {
-      const result = await sendDeviceCommand(imei, "power-on");
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
+    // ── Manual actions (nosleep, etc.) ──
     if (action === "nosleep" && imei) {
       const result = await sendDeviceCommand(imei, "nosleep");
       return new Response(JSON.stringify(result), {
@@ -71,12 +55,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Alarm trigger: activate relay on matching devices ──
+    // ── Alarm trigger: activate siren on matching devices ──
+    // Logic:
+    //   1. Send power-on → energizes relay → siren sounds
+    //   2. If already active → extend timer, report "already sounding"
+    //   3. After relay_duration seconds → send power-off → cuts power → siren stops
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get alarm's parcel to only target devices in that parcel
     const alarmParcel = body.parcel_name || null;
 
     const query = supabase.from("gps_devices").select("imei, relay_duration, relay_active_until, parcel_name");
@@ -108,21 +95,24 @@ Deno.serve(async (req) => {
         : null;
       const isRelayActive = currentActiveUntil && currentActiveUntil > now;
 
+      // Update the active_until timestamp
       await supabase
         .from("gps_devices")
         .update({ relay_active_until: newActiveUntil.toISOString() })
         .eq("imei", device.imei);
 
       if (isRelayActive) {
-        console.log(`[GPS] Relay already active on ${device.imei}, extended`);
+        // Siren already sounding — just extend the timer, no need to send power-on again
+        console.log(`[GPS] Siren already active on ${device.imei}, timer extended to ${newActiveUntil.toISOString()}`);
         results.push({
           imei: device.imei, success: true, relay_duration: duration,
           action: "extended", active_until: newActiveUntil.toISOString(),
         });
       } else {
-        console.log(`[GPS] Activating relay (power-off) on ${device.imei} for ${duration}s`);
+        // Send power-on to energize relay → siren sounds
+        console.log(`[GPS] Activating siren (power-on) on ${device.imei} for ${duration}s`);
         try {
-          const result = await sendDeviceCommand(device.imei, "power-off");
+          const result = await sendDeviceCommand(device.imei, "power-on");
           results.push({
             imei: device.imei, success: result.success, relay_duration: duration,
             action: "activated", active_until: newActiveUntil.toISOString(),
@@ -136,14 +126,15 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Schedule power restore
+      // Schedule automatic power-off after duration
       restorePromises.push((async () => {
         const waitMs = newActiveUntil.getTime() - Date.now();
         if (waitMs > 0) {
-          console.log(`[GPS] Scheduling power-on for ${device.imei} in ${Math.round(waitMs / 1000)}s`);
+          console.log(`[GPS] Scheduling power-off for ${device.imei} in ${Math.round(waitMs / 1000)}s`);
           await new Promise((resolve) => setTimeout(resolve, waitMs));
         }
 
+        // Check if timer was extended by another alarm
         const { data: current } = await supabase
           .from("gps_devices")
           .select("relay_active_until")
@@ -152,12 +143,13 @@ Deno.serve(async (req) => {
 
         const currentUntil = current?.relay_active_until ? new Date(current.relay_active_until) : null;
         if (currentUntil && currentUntil > new Date()) {
-          console.log(`[GPS] Restore skipped for ${device.imei}: timer extended`);
+          console.log(`[GPS] Power-off skipped for ${device.imei}: timer was extended`);
           return;
         }
 
-        console.log(`[GPS] Restoring power on ${device.imei}`);
-        await sendDeviceCommand(device.imei, "power-on");
+        // Send power-off to cut power → siren stops
+        console.log(`[GPS] Stopping siren (power-off) on ${device.imei}`);
+        await sendDeviceCommand(device.imei, "power-off");
 
         await supabase
           .from("gps_devices")
@@ -167,7 +159,7 @@ Deno.serve(async (req) => {
     }
 
     Promise.all(restorePromises).catch((err) =>
-      console.error("[GPS] Error in scheduled restores:", err)
+      console.error("[GPS] Error in scheduled power-off:", err)
     );
 
     return new Response(JSON.stringify({
