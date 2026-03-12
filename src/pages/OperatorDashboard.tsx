@@ -142,7 +142,32 @@ export default function OperatorDashboard() {
   const processingAlarms = alarms.filter((a) => a.status === "processing");
   const resolvedAlarms = alarms.filter((a) => a.status === "resolved");
 
-  const filteredAlarms = statusFilter ? alarms.filter((a) => a.status === statusFilter) : alarms;
+  const filteredAlarms = (() => {
+    let result = statusFilter ? alarms.filter((a) => a.status === statusFilter) : alarms;
+    if (statusFilter === "resolved") {
+      if (filterSender.trim()) {
+        result = result.filter((a) => a.sender_name?.toLowerCase().includes(filterSender.toLowerCase()));
+      }
+      if (filterPhone.trim()) {
+        result = result.filter((a) => a.phone_number?.includes(filterPhone));
+      }
+      if (filterOperator.trim()) {
+        result = result.filter((a) => {
+          const opName = a.processed_by ? operatorMap[a.processed_by] : "";
+          return opName?.toLowerCase().includes(filterOperator.toLowerCase());
+        });
+      }
+      if (filterDateFrom) {
+        const from = new Date(filterDateFrom);
+        result = result.filter((a) => new Date(a.created_at) >= from);
+      }
+      if (filterDateTo) {
+        const to = new Date(filterDateTo + "T23:59:59");
+        result = result.filter((a) => new Date(a.created_at) <= to);
+      }
+    }
+    return result;
+  })();
 
   const roleLabel = role === "director_monitoreo" ? "Director Central" : role === "operator" ? "Operador" : role === "supervisor_central" ? "Supervisor" : "Admin";
 
