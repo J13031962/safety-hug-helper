@@ -7,14 +7,7 @@ const corsHeaders = {
 
 const TRACCAR_API = "http://192.99.16.163:8082/api";
 
-type DeviceAction = "relay-on" | "relay-off" | "nosleep";
-
-// Map actions to Traccar command types
-const TRACCAR_COMMANDS: Record<DeviceAction, { type: string; data: Record<string, string> }> = {
-  "relay-on":  { type: "custom", data: { data: "AT^GT_CM=RELAY,1#" } },
-  "relay-off": { type: "custom", data: { data: "AT^GT_CM=RELAY,0#" } },
-  "nosleep":   { type: "custom", data: { data: "nosleep#" } },
-};
+type DeviceAction = "engineStop" | "engineResume" | "nosleep";
 
 // Login to Traccar and get session cookie
 async function traccarLogin(): Promise<string> {
@@ -32,10 +25,9 @@ async function traccarLogin(): Promise<string> {
     throw new Error(`Traccar login failed: ${res.status} ${body}`);
   }
 
-  // Extract session cookie
   const setCookie = res.headers.get("set-cookie");
   if (!setCookie) throw new Error("No session cookie from Traccar");
-  
+
   const jsessionid = setCookie.match(/JSESSIONID=([^;]+)/)?.[1];
   if (!jsessionid) throw new Error("No JSESSIONID in cookie");
 
@@ -70,17 +62,16 @@ async function sendDeviceCommand(
   action: DeviceAction
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
-    const cmd = TRACCAR_COMMANDS[action];
     const payload = {
       deviceId,
-      type: cmd.type,
+      type: "command",
       description: `TeleGuardia ${action}`,
-      attributes: cmd.data,
+      data: { command: action },
     };
 
-    console.log(`[Traccar] POST /commands/send → deviceId=${deviceId}, type=${cmd.type}, data=${JSON.stringify(cmd.data)}`);
+    console.log(`[Traccar] POST /commands → deviceId=${deviceId}, command=${action}`);
 
-    const res = await fetch(`${TRACCAR_API}/commands/send`, {
+    const res = await fetch(`${TRACCAR_API}/commands`, {
       method: "POST",
       headers: {
         Cookie: cookie,
@@ -112,10 +103,9 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { alarm_type, imei, action } = body;
 
-    // Login to Traccar
     const cookie = await traccarLogin();
 
-    // ── Manual actions (nosleep, relay-on, relay-off) ──
+    // ── Manual actions (engineStop, engineResume, nosleep) ──
     if (action && imei) {
       const deviceId = await findDeviceId(cookie, imei);
       if (!deviceId) {
@@ -165,13 +155,11 @@ Deno.serve(async (req) => {
       const currentActiveUntil = device.relay_active_until ? new Date(device.relay_active_until) : null;
       const isRelayActive = currentActiveUntil && currentActiveUntil > now;
 
-      // Update the active_until timestamp
       await supabase
         .from("gps_devices")
         .update({ relay_active_until: newActiveUntil.toISOString() })
         .eq("imei", device.imei);
 
-      // Find Traccar device ID
       const traccarDeviceId = await findDeviceId(cookie, device.imei);
       if (!traccarDeviceId) {
         results.push({
@@ -188,9 +176,9 @@ Deno.serve(async (req) => {
           action: "extended", active_until: newActiveUntil.toISOString(),
         });
       } else {
-        console.log(`[GPS] Activating siren on ${device.imei} for ${duration}s`);
+        console.log(`[GPS] Activating engineStop on ${device.imei} for ${duration}s`);
         try {
-          const result = await sendDeviceCommand(cookie, traccarDeviceId, "relay-on");
+          const result = await sendDeviceCommand(cookie, traccarDeviceId, "engineStop");
           results.push({
             imei: device.imei, success: result.success, relay_duration: duration,
             action: "activated", active_until: newActiveUntil.toISOString(),
@@ -204,11 +192,11 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Schedule automatic power-off after duration
+      // Schedule automatic restore after duration
       restorePromises.push((async () => {
         const waitMs = newActiveUntil.getTime() - Date.now();
         if (waitMs > 0) {
-          console.log(`[GPS] Scheduling power-off for ${device.imei} in ${Math.round(waitMs / 1000)}s`);
+          console.log(`[GPS] Scheduling engineResume for ${device.imei} in ${Math.round(waitMs / 1000)}s`);
           await new Promise((resolve) => setTimeout(resolve, waitMs));
         }
 
@@ -220,15 +208,14 @@ Deno.serve(async (req) => {
 
         const currentUntil = current?.relay_active_until ? new Date(current.relay_active_until) : null;
         if (currentUntil && currentUntil > new Date()) {
-          console.log(`[GPS] Power-off skipped for ${device.imei}: timer was extended`);
+          console.log(`[GPS] engineResume skipped for ${device.imei}: timer was extended`);
           return;
         }
 
-        console.log(`[GPS] Stopping siren on ${device.imei}`);
-        // Re-login in case session expired
+        console.log(`[GPS] Sending engineResume on ${device.imei}`);
         const newCookie = await traccarLogin();
         const devId = await findDeviceId(newCookie, device.imei);
-        if (devId) await sendDeviceCommand(newCookie, devId, "relay-off");
+        if (devId) await sendDeviceCommand(newCookie, devId, "engineResume");
 
         await supabase
           .from("gps_devices")
@@ -238,7 +225,7 @@ Deno.serve(async (req) => {
     }
 
     Promise.all(restorePromises).catch((err) =>
-      console.error("[GPS] Error in scheduled power-off:", err)
+      console.error("[GPS] Error in scheduled engineResume:", err)
     );
 
     return new Response(JSON.stringify({
