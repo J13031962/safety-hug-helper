@@ -8,12 +8,19 @@ const corsHeaders = {
 const GPS_API_BASE = "http://192.99.16.163:3000";
 const GPS_API_TOKEN = "protrack2026";
 
-type DeviceAction = "power-off" | "power-on" | "nosleep";
+type DeviceAction = "relay-on" | "relay-off" | "nosleep";
+
+const AT_COMMANDS: Record<DeviceAction, string> = {
+  "relay-on":  "AT^GT_CM=RELAY,1#",
+  "relay-off": "AT^GT_CM=RELAY,0#",
+  "nosleep":   "nosleep#",
+};
 
 async function sendDeviceCommand(imei: string, action: DeviceAction): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
-    const url = `${GPS_API_BASE}/api/device/${imei}/${action}`;
-    console.log(`[GPS-API] POST ${url}`);
+    const command = AT_COMMANDS[action];
+    const url = `${GPS_API_BASE}/api/device/${imei}/command`;
+    console.log(`[GPS-API] POST ${url} → ${command}`);
 
     const res = await fetch(url, {
       method: "POST",
@@ -21,6 +28,7 @@ async function sendDeviceCommand(imei: string, action: DeviceAction): Promise<{ 
         "Authorization": `Bearer ${GPS_API_TOKEN}`,
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ command }),
     });
 
     const body = await res.text();
@@ -49,6 +57,22 @@ Deno.serve(async (req) => {
     // ── Manual actions (nosleep, etc.) ──
     if (action === "nosleep" && imei) {
       const result = await sendDeviceCommand(imei, "nosleep");
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "relay-on" && imei) {
+      const result = await sendDeviceCommand(imei, "relay-on");
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "relay-off" && imei) {
+      const result = await sendDeviceCommand(imei, "relay-off");
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -110,9 +134,9 @@ Deno.serve(async (req) => {
         });
       } else {
         // Send power-on to energize relay → siren sounds
-        console.log(`[GPS] Activating siren (power-on) on ${device.imei} for ${duration}s`);
+        console.log(`[GPS] Activating siren (RELAY,1) on ${device.imei} for ${duration}s`);
         try {
-          const result = await sendDeviceCommand(device.imei, "power-on");
+          const result = await sendDeviceCommand(device.imei, "relay-on");
           results.push({
             imei: device.imei, success: result.success, relay_duration: duration,
             action: "activated", active_until: newActiveUntil.toISOString(),
@@ -147,9 +171,9 @@ Deno.serve(async (req) => {
           return;
         }
 
-        // Send power-off to cut power → siren stops
-        console.log(`[GPS] Stopping siren (power-off) on ${device.imei}`);
-        await sendDeviceCommand(device.imei, "power-off");
+        // Send RELAY,0 to cut power → siren stops
+        console.log(`[GPS] Stopping siren (RELAY,0) on ${device.imei}`);
+        await sendDeviceCommand(device.imei, "relay-off");
 
         await supabase
           .from("gps_devices")

@@ -8,16 +8,19 @@ Custom GPS server configuration and API details
 - Auth: Bearer protrack2026
 
 ## REST API Endpoints
-- POST /api/device/{imei}/power-on → Energize relay (poweron#) → SIREN SOUNDS
-- POST /api/device/{imei}/power-off → Cut power (poweroff#) → SIREN STOPS
-- POST /api/device/{imei}/nosleep → Always active mode (nosleep#)
+- POST /api/device/{imei}/command  body: { command: "AT^GT_CM=RELAY,1#" } → Activate relay → SIREN ON
+- POST /api/device/{imei}/command  body: { command: "AT^GT_CM=RELAY,0#" } → Deactivate relay → SIREN OFF
 - Headers: Authorization: Bearer protrack2026
 
+## AT Commands (from VT08F manual)
+- AT^GT_CM=RELAY,1# → Activate relay (close circuit, siren sounds)
+- AT^GT_CM=RELAY,0# → Deactivate relay (open circuit, siren stops)
+
 ## Siren Logic (IMPORTANT)
-- Alarm triggered → send power-on → relay energized → siren sounds
+- Alarm triggered → send RELAY,1# → relay closes → siren sounds
 - If alarm sent again while active → extend timer, show "siren already sounding"
-- After relay_duration seconds → send power-off → relay cuts → siren stops
-- Device stays in power-off state until next alarm
+- After relay_duration seconds → send RELAY,0# → relay opens → siren stops
+- Device stays with relay open until next alarm
 
 ## Device
 - Model: VT08F
