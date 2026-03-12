@@ -249,7 +249,7 @@ export default function OperatorDashboard() {
               <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
                 <Search className="w-4 h-4" /> Filtros
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <Input
                   placeholder="Remitente..."
                   value={filterSender}
