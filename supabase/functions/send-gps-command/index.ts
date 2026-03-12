@@ -8,12 +8,19 @@ const corsHeaders = {
 const GPS_API_BASE = "http://192.99.16.163:3000";
 const GPS_API_TOKEN = "protrack2026";
 
-type DeviceAction = "power-off" | "power-on" | "nosleep";
+type DeviceAction = "relay-on" | "relay-off" | "nosleep";
+
+const AT_COMMANDS: Record<DeviceAction, string> = {
+  "relay-on":  "AT^GT_CM=RELAY,1#",
+  "relay-off": "AT^GT_CM=RELAY,0#",
+  "nosleep":   "nosleep#",
+};
 
 async function sendDeviceCommand(imei: string, action: DeviceAction): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
-    const url = `${GPS_API_BASE}/api/device/${imei}/${action}`;
-    console.log(`[GPS-API] POST ${url}`);
+    const command = AT_COMMANDS[action];
+    const url = `${GPS_API_BASE}/api/device/${imei}/command`;
+    console.log(`[GPS-API] POST ${url} → ${command}`);
 
     const res = await fetch(url, {
       method: "POST",
@@ -21,6 +28,7 @@ async function sendDeviceCommand(imei: string, action: DeviceAction): Promise<{ 
         "Authorization": `Bearer ${GPS_API_TOKEN}`,
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ command }),
     });
 
     const body = await res.text();
