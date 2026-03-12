@@ -7,7 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { LogOut, ArrowLeft, Headphones, MapPin, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import { LogOut, ArrowLeft, Headphones, MapPin, Clock, CheckCircle, AlertTriangle, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import AlarmTimer from "@/components/AlarmTimer";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -29,6 +30,11 @@ export default function OperatorDashboard() {
   const [processing, setProcessing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [operatorMap, setOperatorMap] = useState<Record<string, string>>({});
+  const [filterSender, setFilterSender] = useState("");
+  const [filterPhone, setFilterPhone] = useState("");
+  const [filterOperator, setFilterOperator] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
@@ -136,7 +142,32 @@ export default function OperatorDashboard() {
   const processingAlarms = alarms.filter((a) => a.status === "processing");
   const resolvedAlarms = alarms.filter((a) => a.status === "resolved");
 
-  const filteredAlarms = statusFilter ? alarms.filter((a) => a.status === statusFilter) : alarms;
+  const filteredAlarms = (() => {
+    let result = statusFilter ? alarms.filter((a) => a.status === statusFilter) : alarms;
+    if (statusFilter === "resolved") {
+      if (filterSender.trim()) {
+        result = result.filter((a) => a.sender_name?.toLowerCase().includes(filterSender.toLowerCase()));
+      }
+      if (filterPhone.trim()) {
+        result = result.filter((a) => a.phone_number?.includes(filterPhone));
+      }
+      if (filterOperator.trim()) {
+        result = result.filter((a) => {
+          const opName = a.processed_by ? operatorMap[a.processed_by] : "";
+          return opName?.toLowerCase().includes(filterOperator.toLowerCase());
+        });
+      }
+      if (filterDateFrom) {
+        const from = new Date(filterDateFrom);
+        result = result.filter((a) => new Date(a.created_at) >= from);
+      }
+      if (filterDateTo) {
+        const to = new Date(filterDateTo + "T23:59:59");
+        result = result.filter((a) => new Date(a.created_at) <= to);
+      }
+    }
+    return result;
+  })();
 
   const roleLabel = role === "director_monitoreo" ? "Director Central" : role === "operator" ? "Operador" : role === "supervisor_central" ? "Supervisor" : "Admin";
 
@@ -206,6 +237,53 @@ export default function OperatorDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Filters for resolved */}
+        {statusFilter === "resolved" && (
+          <Card className="border-border mb-4">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                <Search className="w-4 h-4" /> Filtros
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Input
+                  placeholder="Remitente..."
+                  value={filterSender}
+                  onChange={(e) => setFilterSender(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <Input
+                  placeholder="Teléfono..."
+                  value={filterPhone}
+                  onChange={(e) => setFilterPhone(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <Input
+                  placeholder="Operador..."
+                  value={filterOperator}
+                  onChange={(e) => setFilterOperator(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={filterDateFrom}
+                    onChange={(e) => setFilterDateFrom(e.target.value)}
+                    className="h-8 text-xs"
+                    title="Desde"
+                  />
+                  <Input
+                    type="date"
+                    value={filterDateTo}
+                    onChange={(e) => setFilterDateTo(e.target.value)}
+                    className="h-8 text-xs"
+                    title="Hasta"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Alarms list */}
         <div className="space-y-3">
