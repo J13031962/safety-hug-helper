@@ -63,6 +63,22 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "relay-on" && imei) {
+      const result = await sendDeviceCommand(imei, "relay-on");
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "relay-off" && imei) {
+      const result = await sendDeviceCommand(imei, "relay-off");
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ── Alarm trigger: activate siren on matching devices ──
     // Logic:
     //   1. Send power-on → energizes relay → siren sounds
