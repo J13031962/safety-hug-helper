@@ -98,7 +98,7 @@ export default function GpsDevicesTab() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Puerto:</span>
-            <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">8821</code>
+            <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">8822</code>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Protocolo:</span>
