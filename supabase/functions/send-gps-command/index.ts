@@ -171,9 +171,9 @@ Deno.serve(async (req) => {
           return;
         }
 
-        // Send power-off to cut power → siren stops
-        console.log(`[GPS] Stopping siren (power-off) on ${device.imei}`);
-        await sendDeviceCommand(device.imei, "power-off");
+        // Send RELAY,0 to cut power → siren stops
+        console.log(`[GPS] Stopping siren (RELAY,0) on ${device.imei}`);
+        await sendDeviceCommand(device.imei, "relay-off");
 
         await supabase
           .from("gps_devices")
