@@ -11,8 +11,8 @@ Custom GPS server configuration and API details
 - POST /api/session (login, returns JSESSIONID cookie)
 - GET /api/devices?uniqueId={imei} (lookup device by IMEI)
 - POST /api/commands (send command to device)
-  - body: { deviceId, type: "command", description, data: { command: "engineStop" } }
-  - Headers: Cookie: JSESSIONID=xxx, Content-Type: application/json
+  - preferred body: { deviceId, type: "engineStop" | "engineResume", attributes: {}, description }
+  - fallback body (legacy): { deviceId, type: "command", data: { command: "engineStop" | "engineResume" } }
 
 ## Commands (CORRECT format for VT08F)
 - engineStop → Cortar combustible / activar relay (siren sounds)

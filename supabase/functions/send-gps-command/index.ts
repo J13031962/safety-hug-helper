@@ -62,26 +62,51 @@ async function sendDeviceCommand(
   action: DeviceAction
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
-    const payload = {
+    const primaryPayload = {
       deviceId,
-      type: "command",
+      type: action,
+      attributes: {},
       description: `TeleGuardia ${action}`,
-      data: { command: action },
     };
 
-    console.log(`[Traccar] POST /commands → deviceId=${deviceId}, command=${action}`);
+    console.log(`[Traccar] POST /commands → deviceId=${deviceId}, type=${action}`);
 
-    const res = await fetch(`${TRACCAR_API}/commands`, {
+    // 1) Preferred payload for Traccar command types (engineStop/engineResume)
+    let res = await fetch(`${TRACCAR_API}/commands`, {
       method: "POST",
       headers: {
         Cookie: cookie,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(primaryPayload),
     });
 
-    const body = await res.text();
-    console.log(`[Traccar] Status: ${res.status}, Body: ${body}`);
+    let body = await res.text();
+    console.log(`[Traccar] Primary status: ${res.status}, Body: ${body}`);
+
+    // 2) Backward-compatible fallback if API rejects command-type payload
+    if (!res.ok) {
+      const fallbackPayload = {
+        deviceId,
+        type: "command",
+        description: `TeleGuardia ${action}`,
+        data: { command: action },
+      };
+
+      console.warn(`[Traccar] Primary payload failed, trying fallback format for ${action}`);
+
+      res = await fetch(`${TRACCAR_API}/commands`, {
+        method: "POST",
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(fallbackPayload),
+      });
+
+      body = await res.text();
+      console.log(`[Traccar] Fallback status: ${res.status}, Body: ${body}`);
+    }
 
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${body}` };
