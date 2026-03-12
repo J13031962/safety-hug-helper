@@ -94,9 +94,13 @@ export default function GpsDevicesTab() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Puerto:</span>
-            <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">3000</code>
+            <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">8821</code>
           </div>
-          <p className="w-full text-xs text-muted-foreground">Configura esta IP y puerto en cada dispositivo GPS para que se conecte al servidor.</p>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Protocolo:</span>
+            <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">TCP</code>
+          </div>
+          <p className="w-full text-xs text-muted-foreground">Configura esta IP, puerto y protocolo en cada dispositivo GPS para que se conecte al servidor.</p>
         </div>
       </CardHeader>
       <CardContent>
