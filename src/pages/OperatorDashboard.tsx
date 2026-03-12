@@ -269,7 +269,13 @@ export default function OperatorDashboard() {
                   className="h-8 text-xs"
                 />
                 <div className="flex gap-2">
-                  <Input
+                <Input
+                  placeholder="Parcela..."
+                  value={filterParcel}
+                  onChange={(e) => setFilterParcel(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <Input
                     type="date"
                     value={filterDateFrom}
                     onChange={(e) => setFilterDateFrom(e.target.value)}
