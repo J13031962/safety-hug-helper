@@ -21,21 +21,18 @@ function crc16itu(data: Uint8Array): number {
   return crc ^ 0xFFFF;
 }
 
-// ── Build protocol 0x80 command packet ──
-function buildCommandPacket(command: string, serialNumber: number): Uint8Array {
+// ── Build protocol 0x80 command packet (matches server's buildOnlineCommand) ──
+function buildCommandPacket(command: string, serialNumber = 1, serverFlag = 0): Uint8Array {
   const commandBytes = new TextEncoder().encode(command);
-  const commandLen = commandBytes.length;
 
-  // Content length (4 bytes BE) + Server flag (4 bytes) + command + language (2 bytes)
-  const contentLenBytes = 4; // command content length field
-  const serverFlagBytes = 4; // server flag bits
-  const languageBytes = 2;   // language code
+  // contentLength = Flag(1) + ServerFlag(4) + Command(M)
+  const contentLength = 1 + 4 + commandBytes.length;
 
-  // Packet length = protocol(1) + contentLen(4) + serverFlag(4) + command(N) + language(2) + serial(2) = 13 + N
-  const packetLength = 1 + contentLenBytes + serverFlagBytes + commandLen + languageBytes + 2;
+  // packetLength = Protocol(1) + Content + Serial(2) + CRC(2)
+  const packetLength = 1 + contentLength + 2 + 2;
 
-  // Full packet: start(2) + packetLen(1) + protocol(1) + contentLen(4) + serverFlag(4) + command(N) + language(2) + serial(2) + crc(2) + stop(2)
-  const totalSize = 2 + 1 + 1 + contentLenBytes + serverFlagBytes + commandLen + languageBytes + 2 + 2 + 2;
+  // Total buffer: Start(2) + PacketLen(1) + Protocol(1) + ContentLen(1) + ServerFlag(4) + Command(M) + Serial(2) + CRC(2) + Stop(2)
+  const totalSize = 2 + 1 + 1 + 1 + 4 + commandBytes.length + 2 + 2 + 2;
   const packet = new Uint8Array(totalSize);
   let offset = 0;
 
@@ -46,35 +43,28 @@ function buildCommandPacket(command: string, serialNumber: number): Uint8Array {
   // Packet length
   packet[offset++] = packetLength;
 
-  // Protocol number (online command)
+  // Protocol number (0x80 = online command)
   packet[offset++] = 0x80;
 
-  // Command content length (4 bytes, big-endian) - length of the ASCII command
-  packet[offset++] = (commandLen >> 24) & 0xFF;
-  packet[offset++] = (commandLen >> 16) & 0xFF;
-  packet[offset++] = (commandLen >> 8) & 0xFF;
-  packet[offset++] = commandLen & 0xFF;
+  // Content length (1 byte)
+  packet[offset++] = contentLength;
 
-  // Server flag bits (4 bytes, all zeros = from server)
-  packet[offset++] = 0x00;
-  packet[offset++] = 0x00;
-  packet[offset++] = 0x00;
-  packet[offset++] = 0x00;
+  // Server flag (4 bytes, big-endian)
+  packet[offset++] = (serverFlag >> 24) & 0xFF;
+  packet[offset++] = (serverFlag >> 16) & 0xFF;
+  packet[offset++] = (serverFlag >> 8) & 0xFF;
+  packet[offset++] = serverFlag & 0xFF;
 
   // Command content (ASCII)
   packet.set(commandBytes, offset);
-  offset += commandLen;
-
-  // Language (0x0002 = English)
-  packet[offset++] = 0x00;
-  packet[offset++] = 0x02;
+  offset += commandBytes.length;
 
   // Serial number (2 bytes, big-endian)
   packet[offset++] = (serialNumber >> 8) & 0xFF;
   packet[offset++] = serialNumber & 0xFF;
 
-  // CRC-16/ITU: calculated from packet length to serial number (inclusive)
-  const crcData = packet.slice(2, offset); // from packetLength byte to end of serial
+  // CRC-16/ITU: from packet length to serial number (inclusive)
+  const crcData = packet.slice(2, offset);
   const crc = crc16itu(crcData);
   packet[offset++] = (crc >> 8) & 0xFF;
   packet[offset++] = crc & 0xFF;
