@@ -5,43 +5,74 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GPS_API_BASE = "http://192.99.16.163:3000/api";
+const GPS_SERVER_IP = "192.99.16.163";
+const GPS_SERVER_PORT = 8821;
 
-function getApiToken(): string {
-  return Deno.env.get("GPS_API_TOKEN") || "";
+/**
+ * Send a raw TCP command to the VT08F GPS server
+ */
+async function sendTcpCommand(command: string): Promise<{ success: boolean; response?: string; error?: string }> {
+  try {
+    console.log(`[GPS-TCP] Connecting to ${GPS_SERVER_IP}:${GPS_SERVER_PORT}...`);
+    const conn = await Deno.connect({ hostname: GPS_SERVER_IP, port: GPS_SERVER_PORT });
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    // Send command
+    console.log(`[GPS-TCP] Sending command: ${command}`);
+    await conn.write(encoder.encode(command + "\n"));
+
+    // Read response with timeout
+    const buffer = new Uint8Array(1024);
+    let response = "";
+
+    try {
+      // Set a read timeout using AbortController
+      const timeoutId = setTimeout(() => {
+        try { conn.close(); } catch { /* ignore */ }
+      }, 5000);
+
+      const bytesRead = await conn.read(buffer);
+      clearTimeout(timeoutId);
+
+      if (bytesRead !== null) {
+        response = decoder.decode(buffer.subarray(0, bytesRead));
+        console.log(`[GPS-TCP] Response: ${response}`);
+      }
+    } catch (readErr) {
+      console.log(`[GPS-TCP] Read timeout or error (command may still have been sent):`, readErr);
+    }
+
+    try { conn.close(); } catch { /* ignore */ }
+
+    return { success: true, response: response || "Command sent" };
+  } catch (err) {
+    console.error(`[GPS-TCP] Connection error:`, err);
+    return { success: false, error: err instanceof Error ? err.message : "TCP connection failed" };
+  }
 }
 
-function getHeaders(token: string): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${token}`,
-  };
+/**
+ * Activate relay (cut power/activate siren) on VT08F
+ * Common VT08F relay commands:
+ * - relay,1# = activate relay (close circuit)
+ * - relay,0# = deactivate relay (open circuit)
+ */
+async function activateRelay(imei: string): Promise<{ success: boolean; response?: string; error?: string }> {
+  // VT08F command format to activate relay
+  const command = `*HQ,${imei},V1,${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)},A,1#`;
+  console.log(`[GPS] Activating relay for IMEI: ${imei}`);
+  return await sendTcpCommand(command);
 }
 
-async function cutPower(imei: string, token: string) {
-  const res = await fetch(`${GPS_API_BASE}/device/${imei}/power-off`, {
-    method: "POST",
-    headers: getHeaders(token),
-  });
-  return { status: res.status, data: await res.json().catch(() => null) };
-}
-
-async function restorePower(imei: string, token: string) {
-  const res = await fetch(`${GPS_API_BASE}/device/${imei}/power-on`, {
-    method: "POST",
-    headers: getHeaders(token),
-  });
-  return { status: res.status, data: await res.json().catch(() => null) };
-}
-
-async function getDeviceStatus(imei: string) {
-  const res = await fetch(`${GPS_API_BASE}/device/${imei}/status`);
-  return { status: res.status, data: await res.json().catch(() => null) };
-}
-
-async function listDevices() {
-  const res = await fetch(`${GPS_API_BASE}/devices`);
-  return { status: res.status, data: await res.json().catch(() => null) };
+/**
+ * Deactivate relay (restore power/stop siren) on VT08F
+ */
+async function deactivateRelay(imei: string): Promise<{ success: boolean; response?: string; error?: string }> {
+  const command = `*HQ,${imei},V1,${new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)},A,0#`;
+  console.log(`[GPS] Deactivating relay for IMEI: ${imei}`);
+  return await sendTcpCommand(command);
 }
 
 Deno.serve(async (req) => {
@@ -50,56 +81,32 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const token = getApiToken();
-    if (!token) {
-      return new Response(JSON.stringify({ error: "GPS_API_TOKEN no configurado" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const body = await req.json();
     const { alarm_type, imei, action } = body;
 
-    // Special actions (manual control from admin)
-    if (action === "list") {
-      const result = await listDevices();
+    // ── Manual actions from admin panel ──
+    if (action === "relay-on" && imei) {
+      const result = await activateRelay(imei);
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (action === "status" && imei) {
-      const result = await getDeviceStatus(imei);
+    if (action === "relay-off" && imei) {
+      const result = await deactivateRelay(imei);
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (action === "power-on" && imei) {
-      const result = await restorePower(imei, token);
-      return new Response(JSON.stringify({ success: result.status === 200, ...result }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (action === "power-off" && imei) {
-      const result = await cutPower(imei, token);
-      return new Response(JSON.stringify({ success: result.status === 200, ...result }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // ── Alarm trigger: relay-on with concurrency control ──
+    // ── Alarm trigger: activate relay on all devices ──
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get all devices with their current relay state
+    // Get all GPS devices
     const { data: devices } = await supabase
       .from("gps_devices")
       .select("imei, relay_duration, relay_active_until");
@@ -127,15 +134,14 @@ Deno.serve(async (req) => {
         : null;
       const isRelayActive = currentActiveUntil && currentActiveUntil > now;
 
-      // Always extend the relay_active_until timestamp
+      // Update relay_active_until
       await supabase
         .from("gps_devices")
         .update({ relay_active_until: newActiveUntil.toISOString() })
         .eq("imei", device.imei);
 
       if (isRelayActive) {
-        // Relay already ON — just extended the timer, no need to send power-off again
-        console.log(`[GPS] Relay already active on ${device.imei} until ${currentActiveUntil!.toISOString()}, extended to ${newActiveUntil.toISOString()}`);
+        console.log(`[GPS] Relay already active on ${device.imei}, extended to ${newActiveUntil.toISOString()}`);
         results.push({
           imei: device.imei,
           success: true,
@@ -144,17 +150,17 @@ Deno.serve(async (req) => {
           active_until: newActiveUntil.toISOString(),
         });
       } else {
-        // Relay is OFF — send power-off command
+        // Activate relay via TCP
         console.log(`[GPS] Activating relay on ${device.imei} for ${duration}s`);
         try {
-          const result = await cutPower(device.imei, token);
-          const success = result.status === 200;
+          const result = await activateRelay(device.imei);
           results.push({
             imei: device.imei,
-            success,
+            success: result.success,
             relay_duration: duration,
             action: "activated",
             active_until: newActiveUntil.toISOString(),
+            tcp_response: result.response,
           });
         } catch (err) {
           console.error(`[GPS] Error activating ${device.imei}:`, err);
@@ -168,15 +174,15 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Schedule restore: wait until relay_active_until, then check if it should restore
+      // Schedule relay deactivation
       restorePromises.push((async () => {
         const waitMs = newActiveUntil.getTime() - Date.now();
         if (waitMs > 0) {
-          console.log(`[GPS] Scheduling restore check for ${device.imei} in ${Math.round(waitMs / 1000)}s`);
+          console.log(`[GPS] Scheduling relay-off for ${device.imei} in ${Math.round(waitMs / 1000)}s`);
           await new Promise((resolve) => setTimeout(resolve, waitMs));
         }
 
-        // Re-read the device to check if relay_active_until was extended by another alarm
+        // Re-check if timer was extended
         const { data: current } = await supabase
           .from("gps_devices")
           .select("relay_active_until")
@@ -186,20 +192,16 @@ Deno.serve(async (req) => {
         const currentUntil = current?.relay_active_until
           ? new Date(current.relay_active_until)
           : null;
-        const nowCheck = new Date();
 
-        if (currentUntil && currentUntil > nowCheck) {
-          // Another alarm extended the timer — don't restore yet
-          console.log(`[GPS] Restore skipped for ${device.imei}: timer extended to ${currentUntil.toISOString()}`);
+        if (currentUntil && currentUntil > new Date()) {
+          console.log(`[GPS] Restore skipped for ${device.imei}: timer extended`);
           return;
         }
 
-        // Timer expired — send power-on (relay off)
-        console.log(`[GPS] Restoring power on ${device.imei}`);
-        const restoreResult = await restorePower(device.imei, token);
-        console.log(`[GPS] Restore result for ${device.imei}:`, restoreResult);
+        // Deactivate relay
+        console.log(`[GPS] Deactivating relay on ${device.imei}`);
+        await deactivateRelay(device.imei);
 
-        // Clear the relay_active_until
         await supabase
           .from("gps_devices")
           .update({ relay_active_until: null })
