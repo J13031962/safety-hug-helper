@@ -10,18 +10,18 @@ Custom GPS server configuration and API details
 ## Traccar REST API
 - POST /api/session (login, returns JSESSIONID cookie)
 - GET /api/devices?uniqueId={imei} (lookup device by IMEI)
-- POST /api/commands/send (send command to device)
-  - body: { deviceId, type: "custom", description, attributes: { data: "AT command" } }
+- POST /api/commands (send command to device)
+  - body: { deviceId, type: "command", description, data: { command: "engineStop" } }
   - Headers: Cookie: JSESSIONID=xxx, Content-Type: application/json
 
-## AT Commands (from VT08F manual)
-- AT^GT_CM=RELAY,1# → Activate relay (close circuit, siren sounds)
-- AT^GT_CM=RELAY,0# → Deactivate relay (open circuit, siren stops)
+## Commands (CORRECT format for VT08F)
+- engineStop → Cortar combustible / activar relay (siren sounds)
+- engineResume → Restaurar combustible / desactivar relay (siren stops)
 
 ## Siren Logic (IMPORTANT)
-- Alarm triggered → send RELAY,1# via Traccar → relay closes → siren sounds
+- Alarm triggered → send engineStop via Traccar → relay closes → siren sounds
 - If alarm sent again while active → extend timer, show "siren already sounding"
-- After relay_duration seconds → send RELAY,0# via Traccar → relay opens → siren stops
+- After relay_duration seconds → send engineResume via Traccar → relay opens → siren stops
 
 ## Device
 - Model: VT08F
