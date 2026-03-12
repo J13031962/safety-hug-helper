@@ -5,34 +5,92 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const GPS_API_BASE = "http://192.99.16.163:3000";
-const GPS_API_TOKEN = "protrack2026";
+const TRACCAR_API = "http://192.99.16.163:8082/api";
 
 type DeviceAction = "relay-on" | "relay-off" | "nosleep";
 
-const AT_COMMANDS: Record<DeviceAction, string> = {
-  "relay-on":  "AT^GT_CM=RELAY,1#",
-  "relay-off": "AT^GT_CM=RELAY,0#",
-  "nosleep":   "nosleep#",
+// Map actions to Traccar command types
+const TRACCAR_COMMANDS: Record<DeviceAction, { type: string; data: Record<string, string> }> = {
+  "relay-on":  { type: "custom", data: { data: "AT^GT_CM=RELAY,1#" } },
+  "relay-off": { type: "custom", data: { data: "AT^GT_CM=RELAY,0#" } },
+  "nosleep":   { type: "custom", data: { data: "nosleep#" } },
 };
 
-async function sendDeviceCommand(imei: string, action: DeviceAction): Promise<{ success: boolean; response?: string; error?: string }> {
-  try {
-    const command = AT_COMMANDS[action];
-    const url = `${GPS_API_BASE}/api/device/${imei}/command`;
-    console.log(`[GPS-API] POST ${url} → ${command}`);
+// Login to Traccar and get session cookie
+async function traccarLogin(): Promise<string> {
+  const email = Deno.env.get("TRACCAR_EMAIL")!;
+  const password = Deno.env.get("TRACCAR_PASSWORD")!;
 
-    const res = await fetch(url, {
+  const res = await fetch(`${TRACCAR_API}/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ email, password }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Traccar login failed: ${res.status} ${body}`);
+  }
+
+  // Extract session cookie
+  const setCookie = res.headers.get("set-cookie");
+  if (!setCookie) throw new Error("No session cookie from Traccar");
+  
+  const jsessionid = setCookie.match(/JSESSIONID=([^;]+)/)?.[1];
+  if (!jsessionid) throw new Error("No JSESSIONID in cookie");
+
+  console.log("[Traccar] Login OK");
+  return `JSESSIONID=${jsessionid}`;
+}
+
+// Find Traccar device ID by IMEI
+async function findDeviceId(cookie: string, imei: string): Promise<number | null> {
+  const res = await fetch(`${TRACCAR_API}/devices?uniqueId=${imei}`, {
+    headers: { Cookie: cookie },
+  });
+
+  if (!res.ok) {
+    console.error(`[Traccar] Device lookup failed: ${res.status}`);
+    return null;
+  }
+
+  const devices = await res.json();
+  if (devices.length === 0) {
+    console.warn(`[Traccar] No device found for IMEI ${imei}`);
+    return null;
+  }
+
+  return devices[0].id;
+}
+
+// Send command to device via Traccar
+async function sendDeviceCommand(
+  cookie: string,
+  deviceId: number,
+  action: DeviceAction
+): Promise<{ success: boolean; response?: string; error?: string }> {
+  try {
+    const cmd = TRACCAR_COMMANDS[action];
+    const payload = {
+      deviceId,
+      type: cmd.type,
+      description: `TeleGuardia ${action}`,
+      attributes: cmd.data,
+    };
+
+    console.log(`[Traccar] POST /commands/send → deviceId=${deviceId}, type=${cmd.type}, data=${JSON.stringify(cmd.data)}`);
+
+    const res = await fetch(`${TRACCAR_API}/commands/send`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${GPS_API_TOKEN}`,
+        Cookie: cookie,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ command }),
+      body: JSON.stringify(payload),
     });
 
     const body = await res.text();
-    console.log(`[GPS-API] Status: ${res.status}, Body: ${body}`);
+    console.log(`[Traccar] Status: ${res.status}, Body: ${body}`);
 
     if (!res.ok) {
       return { success: false, error: `HTTP ${res.status}: ${body}` };
@@ -40,7 +98,7 @@ async function sendDeviceCommand(imei: string, action: DeviceAction): Promise<{ 
 
     return { success: true, response: body };
   } catch (err) {
-    console.error(`[GPS-API] Error:`, err);
+    console.error(`[Traccar] Error:`, err);
     return { success: false, error: err instanceof Error ? err.message : "API request failed" };
   }
 }
@@ -54,25 +112,20 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { alarm_type, imei, action } = body;
 
-    // ── Manual actions (nosleep, etc.) ──
-    if (action === "nosleep" && imei) {
-      const result = await sendDeviceCommand(imei, "nosleep");
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Login to Traccar
+    const cookie = await traccarLogin();
 
-    if (action === "relay-on" && imei) {
-      const result = await sendDeviceCommand(imei, "relay-on");
-      return new Response(JSON.stringify(result), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // ── Manual actions (nosleep, relay-on, relay-off) ──
+    if (action && imei) {
+      const deviceId = await findDeviceId(cookie, imei);
+      if (!deviceId) {
+        return new Response(JSON.stringify({ success: false, error: `Device ${imei} not found in Traccar` }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-    if (action === "relay-off" && imei) {
-      const result = await sendDeviceCommand(imei, "relay-off");
+      const result = await sendDeviceCommand(cookie, deviceId, action as DeviceAction);
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -80,10 +133,6 @@ Deno.serve(async (req) => {
     }
 
     // ── Alarm trigger: activate siren on matching devices ──
-    // Logic:
-    //   1. Send power-on → energizes relay → siren sounds
-    //   2. If already active → extend timer, report "already sounding"
-    //   3. After relay_duration seconds → send power-off → cuts power → siren stops
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -91,8 +140,7 @@ Deno.serve(async (req) => {
     const alarmParcel = body.parcel_name || null;
 
     const query = supabase.from("gps_devices").select("imei, relay_duration, relay_active_until, parcel_name");
-    
-    const { data: devices } = alarmParcel 
+    const { data: devices } = alarmParcel
       ? await query.eq("parcel_name", alarmParcel)
       : await query;
 
@@ -114,9 +162,7 @@ Deno.serve(async (req) => {
     for (const device of targetDevices) {
       const duration = device.relay_duration ?? 30;
       const newActiveUntil = new Date(now.getTime() + duration * 1000);
-      const currentActiveUntil = device.relay_active_until
-        ? new Date(device.relay_active_until)
-        : null;
+      const currentActiveUntil = device.relay_active_until ? new Date(device.relay_active_until) : null;
       const isRelayActive = currentActiveUntil && currentActiveUntil > now;
 
       // Update the active_until timestamp
@@ -125,18 +171,26 @@ Deno.serve(async (req) => {
         .update({ relay_active_until: newActiveUntil.toISOString() })
         .eq("imei", device.imei);
 
+      // Find Traccar device ID
+      const traccarDeviceId = await findDeviceId(cookie, device.imei);
+      if (!traccarDeviceId) {
+        results.push({
+          imei: device.imei, success: false, action: "error",
+          error: `Device not found in Traccar for IMEI ${device.imei}`,
+        });
+        continue;
+      }
+
       if (isRelayActive) {
-        // Siren already sounding — just extend the timer, no need to send power-on again
-        console.log(`[GPS] Siren already active on ${device.imei}, timer extended to ${newActiveUntil.toISOString()}`);
+        console.log(`[GPS] Siren already active on ${device.imei}, timer extended`);
         results.push({
           imei: device.imei, success: true, relay_duration: duration,
           action: "extended", active_until: newActiveUntil.toISOString(),
         });
       } else {
-        // Send power-on to energize relay → siren sounds
-        console.log(`[GPS] Activating siren (RELAY,1) on ${device.imei} for ${duration}s`);
+        console.log(`[GPS] Activating siren on ${device.imei} for ${duration}s`);
         try {
-          const result = await sendDeviceCommand(device.imei, "relay-on");
+          const result = await sendDeviceCommand(cookie, traccarDeviceId, "relay-on");
           results.push({
             imei: device.imei, success: result.success, relay_duration: duration,
             action: "activated", active_until: newActiveUntil.toISOString(),
@@ -158,7 +212,6 @@ Deno.serve(async (req) => {
           await new Promise((resolve) => setTimeout(resolve, waitMs));
         }
 
-        // Check if timer was extended by another alarm
         const { data: current } = await supabase
           .from("gps_devices")
           .select("relay_active_until")
@@ -171,9 +224,11 @@ Deno.serve(async (req) => {
           return;
         }
 
-        // Send RELAY,0 to cut power → siren stops
-        console.log(`[GPS] Stopping siren (RELAY,0) on ${device.imei}`);
-        await sendDeviceCommand(device.imei, "relay-off");
+        console.log(`[GPS] Stopping siren on ${device.imei}`);
+        // Re-login in case session expired
+        const newCookie = await traccarLogin();
+        const devId = await findDeviceId(newCookie, device.imei);
+        if (devId) await sendDeviceCommand(newCookie, devId, "relay-off");
 
         await supabase
           .from("gps_devices")
