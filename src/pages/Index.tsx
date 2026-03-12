@@ -95,7 +95,7 @@ const IndexContent = () => {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-6">
+      <main className="flex-1 flex flex-col items-center justify-start px-4 pt-10 pb-6 gap-6">
         <div className="w-full max-w-xs px-4">
           <img src={smartsosLogo} alt="SmartSOS Logo" className="w-full h-auto object-contain" />
         </div>
