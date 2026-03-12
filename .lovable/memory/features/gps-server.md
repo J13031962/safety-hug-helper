@@ -2,7 +2,7 @@ Custom GPS server configuration and API details
 
 ## Server
 - IP: 192.99.16.163
-- Port 8821/TCP - GPS devices connect here (internal)
+- Port 8822/TCP - GPS devices connect here (internal)
 - Port 3000/TCP - REST API for app commands
 - Port 8080/TCP - WebSocket for realtime
 - Auth: Bearer protrack2026
