@@ -158,6 +158,9 @@ export default function OperatorDashboard() {
           return opName?.toLowerCase().includes(filterOperator.toLowerCase());
         });
       }
+      if (filterParcel.trim()) {
+        result = result.filter((a) => a.parcel_name?.toLowerCase().includes(filterParcel.toLowerCase()));
+      }
       if (filterDateFrom) {
         const from = new Date(filterDateFrom);
         result = result.filter((a) => new Date(a.created_at) >= from);
