@@ -89,6 +89,10 @@ export default function GpsDevicesTab() {
         </div>
         <div className="flex flex-wrap gap-4 p-3 rounded-md bg-muted/50 border border-border text-sm">
           <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">Plataforma:</span>
+            <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">Protrack VT08F</code>
+          </div>
+          <div className="flex items-center gap-2">
             <span className="text-muted-foreground">Servidor:</span>
             <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">192.99.16.163</code>
           </div>
@@ -100,7 +104,7 @@ export default function GpsDevicesTab() {
             <span className="text-muted-foreground">Protocolo:</span>
             <code className="font-mono text-foreground bg-muted px-2 py-0.5 rounded">TCP</code>
           </div>
-          <p className="w-full text-xs text-muted-foreground">Configura esta IP, puerto y protocolo en cada dispositivo GPS para que se conecte al servidor.</p>
+          <p className="w-full text-xs text-muted-foreground">Configura estos datos en cada dispositivo Protrack VT08F para conectarlo al servidor.</p>
         </div>
       </CardHeader>
       <CardContent>
