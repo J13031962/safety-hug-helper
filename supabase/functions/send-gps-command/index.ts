@@ -134,9 +134,9 @@ Deno.serve(async (req) => {
         });
       } else {
         // Send power-on to energize relay → siren sounds
-        console.log(`[GPS] Activating siren (power-on) on ${device.imei} for ${duration}s`);
+        console.log(`[GPS] Activating siren (RELAY,1) on ${device.imei} for ${duration}s`);
         try {
-          const result = await sendDeviceCommand(device.imei, "power-on");
+          const result = await sendDeviceCommand(device.imei, "relay-on");
           results.push({
             imei: device.imei, success: result.success, relay_duration: duration,
             action: "activated", active_until: newActiveUntil.toISOString(),
