@@ -82,15 +82,15 @@ Deno.serve(async (req) => {
 
     // Build message
     const label = ALARM_LABELS[alarm_type] || `🚨 ${alarm_type?.toUpperCase()}`;
-    let msg = `${label}\n`;
-    if (sender_name) msg += `👤 ${sender_name}\n`;
-    if (house_number) msg += `🏠 Casa: ${house_number}\n`;
-    if (parcel_name) msg += `📍 Parcela: ${parcel_name}\n`;
-    if (address) msg += `📌 ${address}\n`;
+    let msg = `*SmartSOS informa:*\n\n${label}\n`;
+    if (sender_name) msg += `\n👤 ${sender_name}`;
+    if (house_number) msg += `\n🏠 Casa: ${house_number}`;
+    if (parcel_name) msg += `\n📍 Parcela: ${parcel_name}`;
+    if (address) msg += `\n📌 ${address}`;
     if (latitude && longitude) {
-      msg += `🗺️ https://maps.google.com/?q=${latitude},${longitude}\n`;
+      msg += `\n🗺️ https://maps.google.com/?q=${latitude},${longitude}`;
     }
-    if (phone_number) msg += `📞 ${phone_number}`;
+    if (phone_number) msg += `\n📞 ${phone_number}`;
 
     const results = [];
 
