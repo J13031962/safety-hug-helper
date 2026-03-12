@@ -10,11 +10,12 @@ Custom GPS server configuration and API details
 ## Traccar REST API
 - POST /api/session (login, returns JSESSIONID cookie)
 - GET /api/devices?uniqueId={imei} (lookup device by IMEI)
+- GET /api/devices/{id} (get device status)
 - POST /api/commands (send command to device)
-  - preferred body: { deviceId, type: "engineStop" | "engineResume", attributes: {}, description }
-  - fallback body (legacy): { deviceId, type: "command", data: { command: "engineStop" | "engineResume" } }
 
-## Commands (CORRECT format for VT08F)
+## Commands (CORRECT format - VERIFIED WORKING)
+- Payload: `{ deviceId, type: "command", data: { command: "engineStop" | "engineResume" }, description: "..." }`
+- DO NOT use `type: "engineStop"` directly — must be `type: "command"` with `data.command`
 - engineStop → Cortar combustible / activar relay (siren sounds)
 - engineResume → Restaurar combustible / desactivar relay (siren stops)
 
@@ -26,5 +27,5 @@ Custom GPS server configuration and API details
 ## Device
 - Model: VT08F
 - IMEI: 355468592594287
-- Traccar deviceId: 2
+- Traccar deviceId: 1 (NOT 2)
 - Protocol: GT06 binary (0x78 0x78 start)
