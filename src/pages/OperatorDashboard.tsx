@@ -29,6 +29,11 @@ export default function OperatorDashboard() {
   const [processing, setProcessing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [operatorMap, setOperatorMap] = useState<Record<string, string>>({});
+  const [filterSender, setFilterSender] = useState("");
+  const [filterPhone, setFilterPhone] = useState("");
+  const [filterOperator, setFilterOperator] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
 
   useEffect(() => {
     if (!loading && (!user || !role)) {
