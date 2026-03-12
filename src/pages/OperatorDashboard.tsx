@@ -238,6 +238,53 @@ export default function OperatorDashboard() {
           </Card>
         </div>
 
+        {/* Filters for resolved */}
+        {statusFilter === "resolved" && (
+          <Card className="border-border mb-4">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                <Search className="w-4 h-4" /> Filtros
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Input
+                  placeholder="Remitente..."
+                  value={filterSender}
+                  onChange={(e) => setFilterSender(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <Input
+                  placeholder="Teléfono..."
+                  value={filterPhone}
+                  onChange={(e) => setFilterPhone(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <Input
+                  placeholder="Operador..."
+                  value={filterOperator}
+                  onChange={(e) => setFilterOperator(e.target.value)}
+                  className="h-8 text-xs"
+                />
+                <div className="flex gap-2">
+                  <Input
+                    type="date"
+                    value={filterDateFrom}
+                    onChange={(e) => setFilterDateFrom(e.target.value)}
+                    className="h-8 text-xs"
+                    title="Desde"
+                  />
+                  <Input
+                    type="date"
+                    value={filterDateTo}
+                    onChange={(e) => setFilterDateTo(e.target.value)}
+                    className="h-8 text-xs"
+                    title="Hasta"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Alarms list */}
         <div className="space-y-3">
           {alarms.length === 0 && (
