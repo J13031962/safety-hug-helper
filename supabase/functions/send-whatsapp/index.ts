@@ -136,56 +136,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2) Send to individual contacts
-    let query = supabase
-      .from("registered_numbers")
-      .select("phone_number, owner_name, parcel_name");
-
-    if (parcel_name) {
-      query = query.ilike("parcel_name", parcel_name);
-    }
-
-    const { data: contacts, error: dbErr } = await query;
-    if (dbErr) throw dbErr;
-
-    if (!contacts || contacts.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, sent: results.filter(r => r.ok).length, results, message: "No individual contacts found" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    for (const [index, contact] of contacts.entries()) {
-      const recipient = normalize(contact.phone_number);
-
-      try {
-        const formData = new URLSearchParams();
-        formData.append("recipient", recipient);
-        formData.append("apikey", TEXTMEBOT_API_KEY);
-        formData.append("text", msg);
-
-        const res = await fetch("https://api.textmebot.com/send.php", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: formData.toString(),
-        });
-
-        const text = await res.text();
-        const ok = res.status >= 200 && res.status < 300;
-        console.log(`TextMeBot -> ${recipient}: ${res.status} ${text.substring(0, 200)}`);
-
-        results.push({ phone: recipient, ok, httpStatus: res.status, providerResponse: text.substring(0, 200) });
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        console.error(`TextMeBot -> ${recipient}: FAILED ${errorMessage}`);
-        results.push({ phone: recipient, ok: false, httpStatus: 0, providerResponse: errorMessage });
-      }
-
-      if (index < contacts.length - 1) {
-        await new Promise((r) => setTimeout(r, 6000));
-      }
-    }
-
     const sent = results.filter((r) => r.ok).length;
     const failed = results.filter((r) => !r.ok).length;
     const firstError = results.find((r) => !r.ok)?.providerResponse ?? null;
