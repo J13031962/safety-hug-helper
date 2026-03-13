@@ -193,7 +193,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     setTimeout(() => {
       onClose();
     }, 4000);
-  }, [type, state, location]);
+  }, [type, state, location, address, initialLocation]);
 
   const handleClose = () => {
     onClose();
