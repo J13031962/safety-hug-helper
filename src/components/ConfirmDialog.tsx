@@ -139,7 +139,29 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
 
     const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
 
-    const finalLocation = location || initialLocation;
+    const getLiveLocation = async (): Promise<{ lat: number; lng: number } | null> => {
+      if (!navigator.geolocation) return null;
+      return await new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }
+        );
+      });
+    };
+
+    let finalLocation: { lat: number; lng: number } | null = location || initialLocation || null;
+    if (!finalLocation) {
+      finalLocation = await getLiveLocation();
+      if (finalLocation) setLocation(finalLocation);
+    }
+
+    let finalAddress = address;
+    if (!finalAddress && finalLocation) {
+      const geo = await reverseGeocode(finalLocation.lat, finalLocation.lng);
+      finalAddress = geo.full;
+      setAddress(geo.full);
+    }
 
     const alarmData = {
       alarm_type: type,
@@ -149,7 +171,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       parcel_name: settings.parcelName || "",
       latitude: finalLocation?.lat ?? null,
       longitude: finalLocation?.lng ?? null,
-      address: address || null,
+      address: finalAddress || null,
     };
 
     const { error } = await supabase.from("alarms").insert(alarmData);

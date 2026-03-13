@@ -87,9 +87,19 @@ Deno.serve(async (req) => {
     if (house_number) msg += `\n🏠 Casa: ${house_number}`;
     if (parcel_name) msg += `\n📍 Parcela: ${parcel_name}`;
     if (address) msg += `\n📌 ${address}`;
-    if (latitude && longitude) {
-      msg += `\n🗺️ https://maps.google.com/?q=${latitude},${longitude}`;
+
+    const lat = latitude !== null && latitude !== undefined ? Number(latitude) : NaN;
+    const lng = longitude !== null && longitude !== undefined ? Number(longitude) : NaN;
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
+    const fallbackLocation = [house_number ? `Casa ${house_number}` : null, parcel_name ? `Parcela ${parcel_name}` : null]
+      .filter(Boolean)
+      .join(", ");
+    const mapQuery = hasCoords ? `${lat},${lng}` : (address?.trim() || fallbackLocation);
+
+    if (mapQuery) {
+      msg += `\n🗺️ https://maps.google.com/?q=${encodeURIComponent(mapQuery)}`;
     }
+
     if (phone_number) msg += `\n📞 ${phone_number}`;
 
     const results = [];
