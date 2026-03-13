@@ -363,18 +363,31 @@ export default function OperatorDashboard() {
                         <div><span className="text-muted-foreground">Parcela:</span> {alarm.parcel_name || "—"}</div>
                         <div className="col-span-2">
                           <span className="text-muted-foreground">Ubicación:</span>{" "}
-                          {alarm.latitude && alarm.longitude ? (
-                            <a
-                              href={`https://maps.google.com/?q=${alarm.latitude},${alarm.longitude}`}
-                              target="_blank"
-                              rel="noopener"
-                              className="inline-flex items-center gap-1 text-emergency-medical hover:underline"
-                            >
-                              <MapPin className="w-3 h-3" /> Ver en Google Maps
-                            </a>
-                          ) : (
-                            <span>—</span>
-                          )}
+                          {(() => {
+                            const hasCoords = alarm.latitude !== null && alarm.longitude !== null;
+                            const fallbackLocation = [
+                              alarm.house_number ? `Casa ${alarm.house_number}` : null,
+                              alarm.parcel_name ? `Parcela ${alarm.parcel_name}` : null,
+                            ]
+                              .filter(Boolean)
+                              .join(", ");
+                            const mapQuery = hasCoords
+                              ? `${alarm.latitude},${alarm.longitude}`
+                              : (alarm.address?.trim() || fallbackLocation);
+
+                            if (!mapQuery) return <span>—</span>;
+
+                            return (
+                              <a
+                                href={`https://maps.google.com/?q=${encodeURIComponent(mapQuery)}`}
+                                target="_blank"
+                                rel="noopener"
+                                className="inline-flex items-center gap-1 text-emergency-medical hover:underline"
+                              >
+                                <MapPin className="w-3 h-3" /> Ver en Google Maps
+                              </a>
+                            );
+                          })()}
                         </div>
                       </div>
                       {alarm.observations && (
