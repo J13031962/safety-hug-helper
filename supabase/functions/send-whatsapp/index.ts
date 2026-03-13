@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
     }
 
     if (phone_number) msg += `\n📞 ${phone_number}`;
+    msg += `\n\n🌐 www.teleguardia.com`;
 
     const results = [];
 
