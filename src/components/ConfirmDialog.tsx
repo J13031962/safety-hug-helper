@@ -139,14 +139,16 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
 
     const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
 
+    const finalLocation = location || initialLocation;
+
     const alarmData = {
       alarm_type: type,
       sender_name: settings.senderName || "Usuario",
       phone_number: settings.phoneNumber || "",
       house_number: settings.houseNumber || "",
       parcel_name: settings.parcelName || "",
-      latitude: location?.lat ?? null,
-      longitude: location?.lng ?? null,
+      latitude: finalLocation?.lat ?? null,
+      longitude: finalLocation?.lng ?? null,
       address: address || null,
     };
 
@@ -191,7 +193,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     setTimeout(() => {
       onClose();
     }, 4000);
-  }, [type, state, location]);
+  }, [type, state, location, address, initialLocation]);
 
   const handleClose = () => {
     onClose();
