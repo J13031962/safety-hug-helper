@@ -22,7 +22,7 @@ export default function ParcelsTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Parcel | null>(null);
-  const [form, setForm] = useState({ name: "", whatsapp_group_id: "" });
+  const [form, setForm] = useState({ name: "", whatsapp_group_id: "", whatsapp_invite_link: "" });
   const [submitting, setSubmitting] = useState(false);
 
   // Resolve group ID dialog
