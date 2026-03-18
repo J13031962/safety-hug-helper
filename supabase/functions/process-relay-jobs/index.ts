@@ -41,7 +41,7 @@ async function postCommandAttempt(
   name: string,
   payload: Record<string, unknown>,
 ): Promise<CommandAttemptResult> {
-  const res = await fetch(`${TRACCAR_API}/commands`, {
+  const res = await fetch(`${TRACCAR_API}/commands/send`, {
     method: "POST",
     headers: { Cookie: cookie, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
