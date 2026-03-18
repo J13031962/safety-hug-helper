@@ -196,7 +196,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     let gpsWarning: string | null = null;
     try {
       const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
-        body: { alarm_type: type, parcel_name: settings.parcelName || "" },
+        body: { alarm_type: type, phone_number: settings.phoneNumber || "", parcel_name: settings.parcelName || "" },
       });
       if (gpsErr) {
         console.warn("[GPS] Error activando dispositivos:", gpsErr);
