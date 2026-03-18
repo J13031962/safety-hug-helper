@@ -42,7 +42,7 @@ export default function ParcelsTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", whatsapp_group_id: "" });
+    setForm({ name: "", whatsapp_group_id: "", whatsapp_invite_link: "" });
     setDialogOpen(true);
   };
 
