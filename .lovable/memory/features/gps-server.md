@@ -12,19 +12,22 @@ Custom GPS server configuration and API details
 - POST /api/session (login, returns JSESSIONID cookie)
 - GET /api/devices?uniqueId={imei} (lookup device by IMEI)
 - GET /api/devices/{id} (get device status)
-- POST /api/commands (send command to device)
+- POST /api/commands/send (send command to device)
 
 ## Commands
 - Preferred for relay: `{ deviceId, type: "engineStop" | "engineResume", attributes: {}, description: "..." }`
 - Fallback compatibility: `{ deviceId, type: "command", data: { command: "engineStop" | "engineResume" }, description: "..." }`
-- engineStop → Cortar combustible / activar relay (siren sounds)
-- engineResume → Restaurar combustible / desactivar relay (siren stops)
 
-## Siren Logic (IMPORTANT)
-- Alarm triggered → send engineStop via Traccar → relay closes → siren sounds
+## Siren Logic (IMPORTANT - INVERTED RELAY)
+- Alarm triggered → send engineResume via Traccar → relay opens → siren sounds
 - If alarm sent again while active → extend timer, show "siren already sounding"
-- After relay_duration seconds → send engineResume via Traccar → relay opens → siren stops
+- After relay_duration seconds → send engineStop via Traccar → relay closes → siren stops
 - Parcel matching is case-insensitive (trim + lowercase)
+- Commands are INVERTED: engineResume=ON, engineStop=OFF
+
+## Cron Worker
+- process-relay-jobs runs every ~20 seconds (3 pg_cron jobs with 0/20/40s offsets)
+- Checks relay_active_until to prevent premature engineStop from stale jobs
 
 ## Device
 - Model: VT08F
