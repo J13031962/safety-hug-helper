@@ -191,7 +191,7 @@ export default function ParcelsTab() {
                 </TableRow>
               ))}
               {parcels.length === 0 && (
-                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No hay parcelas</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No hay parcelas</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
