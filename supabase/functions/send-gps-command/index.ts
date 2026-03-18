@@ -82,6 +82,18 @@ async function postCommandAttempt(
   };
 }
 
+function getRelayTextCommands(action: DeviceAction): string[] {
+  if (action === "engineStop") {
+    return ["RELAY,1#", "relay,1#", "222#"];
+  }
+
+  if (action === "engineResume") {
+    return ["RELAY,0#", "relay,0#", "333#"];
+  }
+
+  return [];
+}
+
 async function sendDeviceCommand(
   cookie: string,
   deviceId: number,
@@ -98,7 +110,7 @@ async function sendDeviceCommand(
     });
     attempts.push(nativeAttempt);
 
-    if (!nativeAttempt.ok && (action === "engineStop" || action === "engineResume")) {
+    if (action === "engineStop" || action === "engineResume") {
       const fallbackAttempt = await postCommandAttempt(cookie, "fallback-command", {
         deviceId,
         type: "command",
@@ -106,18 +118,28 @@ async function sendDeviceCommand(
         data: { command: action },
       });
       attempts.push(fallbackAttempt);
-    }
 
-    if (action === "engineStop" || action === "engineResume") {
-      const relayCommand = action === "engineStop" ? "RELAY,1#" : "RELAY,0#";
-      const customRelayAttempt = await postCommandAttempt(cookie, "custom-relay", {
-        deviceId,
-        type: "custom",
-        textChannel: false,
-        description: `TeleGuardia ${action} relay`,
-        attributes: { data: relayCommand },
-      });
-      attempts.push(customRelayAttempt);
+      const relayCommands = getRelayTextCommands(action);
+
+      for (const relayCommand of relayCommands) {
+        const customGprsAttempt = await postCommandAttempt(cookie, `custom-gprs-${relayCommand}`, {
+          deviceId,
+          type: "custom",
+          textChannel: false,
+          description: `TeleGuardia ${action} relay gprs`,
+          attributes: { data: relayCommand },
+        });
+        attempts.push(customGprsAttempt);
+
+        const customSmsAttempt = await postCommandAttempt(cookie, `custom-sms-${relayCommand}`, {
+          deviceId,
+          type: "custom",
+          textChannel: true,
+          description: `TeleGuardia ${action} relay sms`,
+          attributes: { data: relayCommand },
+        });
+        attempts.push(customSmsAttempt);
+      }
     }
 
     const successful = attempts.filter((a) => a.ok);
