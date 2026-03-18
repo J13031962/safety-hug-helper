@@ -83,7 +83,8 @@ async function sendDeviceCommand(
           },
         ];
 
-    let lastError: string | undefined;
+    const successBodies: string[] = [];
+    const failedAttempts: string[] = [];
 
     for (let i = 0; i < payloads.length; i++) {
       const payload = payloads[i];
@@ -103,14 +104,23 @@ async function sendDeviceCommand(
       console.log(`[Traccar] Response status: ${res.status}, Body: ${body}`);
 
       if (res.ok) {
-        return { success: true, response: body };
+        successBodies.push(body);
+        continue;
       }
 
-      lastError = `HTTP ${res.status}: ${body}`;
-      console.warn(`[Traccar] Attempt ${i + 1} failed: ${lastError}`);
+      const errorMsg = `type=${payload.type} HTTP ${res.status}: ${body}`;
+      failedAttempts.push(errorMsg);
+      console.warn(`[Traccar] Attempt ${i + 1} failed: ${errorMsg}`);
     }
 
-    return { success: false, error: lastError || "Command rejected by Traccar" };
+    if (successBodies.length > 0) {
+      if (successBodies.length > 1) {
+        console.log(`[Traccar] Multiple command formats accepted for action=${action}`);
+      }
+      return { success: true, response: successBodies[successBodies.length - 1] };
+    }
+
+    return { success: false, error: failedAttempts.join(" | ") || "Command rejected by Traccar" };
   } catch (err) {
     console.error(`[Traccar] Error:`, err);
     return { success: false, error: err instanceof Error ? err.message : "API request failed" };
@@ -167,7 +177,7 @@ Deno.serve(async (req) => {
     }
 
     // Case-insensitive parcel matching
-    let targetDevices = (allDevices || []).filter((d: any) => {
+    const targetDevices = (allDevices || []).filter((d: any) => {
       if (imei) return d.imei === imei;
       if (!normalizedParcel) return true;
       return (d.parcel_name || "").trim().toLowerCase() === normalizedParcel;
@@ -197,44 +207,51 @@ Deno.serve(async (req) => {
       const duration = device.relay_duration ?? 30;
       const newActiveUntil = new Date(now.getTime() + duration * 1000);
       const currentActiveUntil = device.relay_active_until ? new Date(device.relay_active_until) : null;
-      const isRelayActive = currentActiveUntil && currentActiveUntil > now;
-
-      await supabase
-        .from("gps_devices")
-        .update({ relay_active_until: newActiveUntil.toISOString() })
-        .eq("imei", device.imei);
+      const wasRelayActive = Boolean(currentActiveUntil && currentActiveUntil > now);
 
       const traccarDeviceId = await findDeviceId(cookie, device.imei);
       if (!traccarDeviceId) {
         results.push({
-          imei: device.imei, success: false, action: "error",
+          imei: device.imei,
+          success: false,
+          action: "error",
           error: `Device not found in Traccar for IMEI ${device.imei}`,
         });
         continue;
       }
 
-      if (isRelayActive) {
-        console.log(`[GPS] Siren already active on ${device.imei}, timer extended`);
+      console.log(`[GPS] Sending engineStop on ${device.imei} for ${duration}s (${wasRelayActive ? "relay_active_refresh" : "new_cycle"})`);
+      const stopResult = await sendDeviceCommand(cookie, traccarDeviceId, "engineStop");
+
+      if (!stopResult.success) {
         results.push({
-          imei: device.imei, success: true, relay_duration: duration,
-          action: "extended", active_until: newActiveUntil.toISOString(),
+          imei: device.imei,
+          success: false,
+          relay_duration: duration,
+          action: "error",
+          error: stopResult.error || "engineStop rejected by Traccar",
         });
-      } else {
-        console.log(`[GPS] Activating engineStop on ${device.imei} for ${duration}s`);
-        try {
-          const result = await sendDeviceCommand(cookie, traccarDeviceId, "engineStop");
-          results.push({
-            imei: device.imei, success: result.success, relay_duration: duration,
-            action: "activated", active_until: newActiveUntil.toISOString(),
-            api_response: result.response,
-          });
-        } catch (err) {
-          results.push({
-            imei: device.imei, success: false, relay_duration: duration,
-            action: "error", error: err instanceof Error ? err.message : "Error desconocido",
-          });
-        }
+        continue;
       }
+
+      const { error: relayUpdateError } = await supabase
+        .from("gps_devices")
+        .update({ relay_active_until: newActiveUntil.toISOString() })
+        .eq("imei", device.imei);
+
+      if (relayUpdateError) {
+        console.error(`[GPS] Failed updating relay_active_until for ${device.imei}:`, relayUpdateError.message);
+      }
+
+      results.push({
+        imei: device.imei,
+        success: true,
+        relay_duration: duration,
+        action: wasRelayActive ? "retriggered" : "activated",
+        active_until: newActiveUntil.toISOString(),
+        api_response: stopResult.response,
+        db_warning: relayUpdateError?.message,
+      });
 
       // Schedule automatic restore after duration
       restorePromises.push((async () => {
