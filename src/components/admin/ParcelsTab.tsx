@@ -169,6 +169,13 @@ export default function ParcelsTab() {
                     )}
                   </TableCell>
                   <TableCell>
+                    {p.whatsapp_invite_link ? (
+                      <a href={p.whatsapp_invite_link} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline truncate max-w-[200px] inline-block">{p.whatsapp_invite_link}</a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Sin enlace</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" title="Vincular grupo" onClick={() => openResolve(p)}>
                         <MessageSquare className="w-4 h-4" />
