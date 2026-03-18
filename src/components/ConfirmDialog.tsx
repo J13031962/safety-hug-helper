@@ -278,7 +278,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
             </div>
             <h2 className="text-xl font-display font-bold">¡Alerta Enviada!</h2>
             <p className="text-sm text-muted-foreground text-center">
-              Se notificó a todos los contactos y se activó la sirena.
+              Se notificó a todos los contactos registrados.
             </p>
             {whatsappWarning && (
               <div className="w-full rounded-lg border border-emergency-disaster/40 bg-emergency-disaster/10 p-3 text-xs text-emergency-disaster flex items-start gap-2">
