@@ -101,6 +101,45 @@ export type Database = {
         }
         Relationships: []
       }
+      gps_relay_jobs: {
+        Row: {
+          action: string
+          alarm_id: string | null
+          completed_at: string | null
+          created_at: string
+          device_id_traccar: number
+          error_message: string | null
+          execute_at: string
+          id: string
+          imei: string
+          status: string
+        }
+        Insert: {
+          action?: string
+          alarm_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          device_id_traccar: number
+          error_message?: string | null
+          execute_at: string
+          id?: string
+          imei: string
+          status?: string
+        }
+        Update: {
+          action?: string
+          alarm_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          device_id_traccar?: number
+          error_message?: string | null
+          execute_at?: string
+          id?: string
+          imei?: string
+          status?: string
+        }
+        Relationships: []
+      }
       parcels: {
         Row: {
           created_at: string
