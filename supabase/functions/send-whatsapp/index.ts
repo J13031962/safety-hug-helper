@@ -100,7 +100,21 @@ Deno.serve(async (req) => {
       msg += `\n🗺️ https://maps.google.com/?q=${encodeURIComponent(mapQuery)}`;
     }
 
-    if (phone_number) msg += `\n📞 ${phone_number}`;
+    // Fetch invite link for the parcel's WhatsApp group
+    let inviteLink: string | null = null;
+    if (parcel_name) {
+      const { data: parcelData } = await supabase
+        .from("parcels")
+        .select("whatsapp_invite_link")
+        .ilike("name", parcel_name)
+        .maybeSingle();
+      inviteLink = parcelData?.whatsapp_invite_link || null;
+    }
+
+    if (inviteLink) {
+      msg += `\n\n💬 Chat en grupo: ${inviteLink}`;
+    }
+
     msg += `\n\n🌐 www.teleguardia.com`;
 
     const results = [];

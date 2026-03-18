@@ -13,6 +13,7 @@ interface Parcel {
   id: string;
   name: string;
   whatsapp_group_id: string | null;
+  whatsapp_invite_link: string | null;
   created_at: string;
 }
 
@@ -21,7 +22,7 @@ export default function ParcelsTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Parcel | null>(null);
-  const [form, setForm] = useState({ name: "", whatsapp_group_id: "" });
+  const [form, setForm] = useState({ name: "", whatsapp_group_id: "", whatsapp_invite_link: "" });
   const [submitting, setSubmitting] = useState(false);
 
   // Resolve group ID dialog
@@ -41,13 +42,13 @@ export default function ParcelsTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", whatsapp_group_id: "" });
+    setForm({ name: "", whatsapp_group_id: "", whatsapp_invite_link: "" });
     setDialogOpen(true);
   };
 
   const openEdit = (p: Parcel) => {
     setEditing(p);
-    setForm({ name: p.name, whatsapp_group_id: p.whatsapp_group_id || "" });
+    setForm({ name: p.name, whatsapp_group_id: p.whatsapp_group_id || "", whatsapp_invite_link: p.whatsapp_invite_link || "" });
     setDialogOpen(true);
   };
 
@@ -60,6 +61,7 @@ export default function ParcelsTab() {
     const payload = {
       name: form.name.trim(),
       whatsapp_group_id: form.whatsapp_group_id.trim() || null,
+      whatsapp_invite_link: form.whatsapp_invite_link.trim() || null,
     };
 
     if (editing) {
@@ -151,6 +153,7 @@ export default function ParcelsTab() {
               <TableRow>
                 <TableHead>Parcela</TableHead>
                 <TableHead>Grupo WhatsApp ID</TableHead>
+                <TableHead>Enlace de invitación</TableHead>
                 <TableHead className="w-32">Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -163,6 +166,13 @@ export default function ParcelsTab() {
                       <span className="text-xs font-mono text-primary">{p.whatsapp_group_id}</span>
                     ) : (
                       <span className="text-xs text-muted-foreground italic">Sin grupo</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {p.whatsapp_invite_link ? (
+                      <a href={p.whatsapp_invite_link} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline truncate max-w-[200px] inline-block">{p.whatsapp_invite_link}</a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Sin enlace</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -181,7 +191,7 @@ export default function ParcelsTab() {
                 </TableRow>
               ))}
               {parcels.length === 0 && (
-                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No hay parcelas</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No hay parcelas</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -201,6 +211,11 @@ export default function ParcelsTab() {
               <Label>Group ID de WhatsApp (opcional)</Label>
               <Input value={form.whatsapp_group_id} onChange={(e) => setForm(f => ({ ...f, whatsapp_group_id: e.target.value }))} placeholder="Ej: 120363407230255450@g.us" className="font-mono text-sm" />
               <p className="text-xs text-muted-foreground">Puedes obtenerlo con el botón de vincular grupo después de crear la parcela.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Enlace de invitación WhatsApp (opcional)</Label>
+              <Input value={form.whatsapp_invite_link} onChange={(e) => setForm(f => ({ ...f, whatsapp_invite_link: e.target.value }))} placeholder="https://chat.whatsapp.com/XXXXXX" className="text-sm" />
+              <p className="text-xs text-muted-foreground">Este enlace aparecerá en el mensaje de alarma para que los vecinos puedan unirse al chat.</p>
             </div>
           </div>
           <DialogFooter>
