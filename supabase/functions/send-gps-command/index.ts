@@ -5,11 +5,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const TRACCAR_API = "http://192.99.16.163:8082/api";
+const TRACCAR_API = Deno.env.get("TRACCAR_API_URL") || "https://gps.smarturban.co/api";
 
 type DeviceAction = "engineStop" | "engineResume" | "nosleep";
 
-// Login to Traccar and get session cookie
 async function traccarLogin(): Promise<string> {
   const email = Deno.env.get("TRACCAR_EMAIL")!;
   const password = Deno.env.get("TRACCAR_PASSWORD")!;
@@ -35,7 +34,6 @@ async function traccarLogin(): Promise<string> {
   return `JSESSIONID=${jsessionid}`;
 }
 
-// Find Traccar device ID by IMEI
 async function findDeviceId(cookie: string, imei: string): Promise<number | null> {
   const res = await fetch(`${TRACCAR_API}/devices?uniqueId=${imei}`, {
     headers: { Cookie: cookie },
@@ -55,14 +53,12 @@ async function findDeviceId(cookie: string, imei: string): Promise<number | null
   return devices[0].id;
 }
 
-// Send command to device via Traccar
 async function sendDeviceCommand(
   cookie: string,
   deviceId: number,
   action: DeviceAction
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
-    // Correct format: type "command" with data.command = action
     const payload = {
       deviceId,
       type: "command",
@@ -129,21 +125,42 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const alarmParcel = body.parcel_name || null;
+    const alarmParcel = (body.parcel_name || "").trim();
+    const normalizedParcel = alarmParcel.toLowerCase();
 
-    const query = supabase.from("gps_devices").select("imei, relay_duration, relay_active_until, parcel_name");
-    const { data: devices } = alarmParcel
-      ? await query.eq("parcel_name", alarmParcel)
-      : await query;
+    // Fetch ALL devices, then filter case-insensitively
+    const { data: allDevices, error: dbError } = await supabase
+      .from("gps_devices")
+      .select("imei, relay_duration, relay_active_until, parcel_name");
 
-    const targetDevices = (devices || []).filter((d: any) =>
-      imei ? d.imei === imei : true
-    );
+    if (dbError) {
+      console.error("[GPS] DB error fetching devices:", dbError);
+      return new Response(JSON.stringify({ success: false, reason: "db_error", error: dbError.message }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Case-insensitive parcel matching
+    let targetDevices = (allDevices || []).filter((d: any) => {
+      if (imei) return d.imei === imei;
+      if (!normalizedParcel) return true;
+      return (d.parcel_name || "").trim().toLowerCase() === normalizedParcel;
+    });
+
+    console.log(`[GPS] Parcel requested: "${alarmParcel}" (normalized: "${normalizedParcel}")`);
+    console.log(`[GPS] Total devices in DB: ${allDevices?.length || 0}`);
+    console.log(`[GPS] Matched devices: ${targetDevices.length}`);
+    if (targetDevices.length === 0 && allDevices && allDevices.length > 0) {
+      const availableParcels = [...new Set(allDevices.map((d: any) => d.parcel_name))];
+      console.log(`[GPS] Available parcels in DB: ${JSON.stringify(availableParcels)}`);
+    }
 
     if (targetDevices.length === 0) {
       return new Response(JSON.stringify({
         success: false,
-        message: "No hay dispositivos GPS registrados para esta parcela",
+        reason: "no_devices_for_parcel",
+        message: `No hay dispositivos GPS registrados para la parcela "${alarmParcel}"`,
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

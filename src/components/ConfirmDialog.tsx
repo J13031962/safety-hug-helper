@@ -193,12 +193,21 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     }
 
     // Try GPS siren/relay activation
+    let gpsWarning: string | null = null;
     try {
       const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
         body: { alarm_type: type, parcel_name: settings.parcelName || "" },
       });
       if (gpsErr) {
         console.warn("[GPS] Error activando dispositivos:", gpsErr);
+        gpsWarning = "No se pudo activar la sirena GPS.";
+      } else if (gpsData?.success === false) {
+        console.warn("[GPS] No devices found:", gpsData.reason, gpsData.message);
+        if (gpsData.reason === "no_devices_for_parcel") {
+          gpsWarning = `No hay dispositivos GPS registrados para "${settings.parcelName}".`;
+        } else {
+          gpsWarning = gpsData.message || "No se pudo activar la sirena GPS.";
+        }
       } else if (gpsData?.results) {
         const extended = gpsData.results.filter((r: any) => r.action === "extended");
         if (extended.length > 0 && gpsData.results.length === extended.length) {
@@ -207,6 +216,14 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       }
     } catch (gpsEx) {
       console.warn("[GPS] Error activando dispositivos:", gpsEx);
+      gpsWarning = "No se pudo activar la sirena GPS.";
+    }
+
+    if (gpsWarning) {
+      setWhatsappWarning((prev) => {
+        const parts = [prev, `📡 ${gpsWarning}`].filter(Boolean);
+        return parts.join("\n");
+      });
     }
 
     setState("success");
