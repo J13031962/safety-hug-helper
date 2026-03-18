@@ -1,0 +1,1 @@
+ALTER TABLE public.parcels ADD COLUMN whatsapp_invite_link TEXT;

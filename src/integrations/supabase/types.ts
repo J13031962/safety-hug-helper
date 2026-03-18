@@ -146,18 +146,21 @@ export type Database = {
           id: string
           name: string
           whatsapp_group_id: string | null
+          whatsapp_invite_link: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
           whatsapp_group_id?: string | null
+          whatsapp_invite_link?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
           whatsapp_group_id?: string | null
+          whatsapp_invite_link?: string | null
         }
         Relationships: []
       }
