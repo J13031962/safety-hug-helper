@@ -9,6 +9,13 @@ const TRACCAR_API = Deno.env.get("TRACCAR_API_URL") || "https://gps.smarturban.c
 
 type DeviceAction = "engineStop" | "engineResume" | "nosleep";
 
+type CommandAttemptResult = {
+  name: string;
+  ok: boolean;
+  status: number;
+  body: string;
+};
+
 async function traccarLogin(): Promise<string> {
   const email = Deno.env.get("TRACCAR_EMAIL")!;
   const password = Deno.env.get("TRACCAR_PASSWORD")!;
@@ -40,12 +47,12 @@ async function findDeviceId(cookie: string, imei: string): Promise<number | null
   });
 
   if (!res.ok) {
-    console.error(`[Traccar] Device lookup failed: ${res.status}`);
+    console.error(`[Traccar] Device lookup failed for ${imei}: ${res.status}`);
     return null;
   }
 
   const devices = await res.json();
-  if (devices.length === 0) {
+  if (!devices?.length) {
     console.warn(`[Traccar] No device found for IMEI ${imei}`);
     return null;
   }
@@ -53,84 +60,108 @@ async function findDeviceId(cookie: string, imei: string): Promise<number | null
   return devices[0].id;
 }
 
-// Send command with fallback: try native type first, if it fails try generic "command" type
+async function postCommandAttempt(
+  cookie: string,
+  name: string,
+  payload: Record<string, unknown>,
+): Promise<CommandAttemptResult> {
+  const res = await fetch(`${TRACCAR_API}/commands`, {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await res.text();
+  console.log(`[Traccar] Attempt ${name} -> ${res.status} ${body}`);
+
+  return {
+    name,
+    ok: res.ok,
+    status: res.status,
+    body,
+  };
+}
+
 async function sendDeviceCommand(
   cookie: string,
   deviceId: number,
-  action: DeviceAction
-): Promise<{ success: boolean; response?: string; error?: string }> {
+  action: DeviceAction,
+): Promise<{ success: boolean; response?: string; error?: string; attempts: CommandAttemptResult[] }> {
   try {
-    // Attempt 1: native type (engineStop / engineResume)
-    const nativePayload = {
+    const attempts: CommandAttemptResult[] = [];
+
+    const nativeAttempt = await postCommandAttempt(cookie, "native", {
       deviceId,
       type: action,
       description: `TeleGuardia ${action}`,
       attributes: {},
-    };
-
-    console.log(`[Traccar] POST /commands → deviceId=${deviceId}, type=${action}`);
-    const res1 = await fetch(`${TRACCAR_API}/commands`, {
-      method: "POST",
-      headers: { Cookie: cookie, "Content-Type": "application/json" },
-      body: JSON.stringify(nativePayload),
     });
+    attempts.push(nativeAttempt);
 
-    const body1 = await res1.text();
-    console.log(`[Traccar] Response: ${res1.status} ${body1}`);
-
-    if (res1.ok) {
-      return { success: true, response: body1 };
-    }
-
-    // Attempt 2: fallback generic command type
-    if (action === "engineStop" || action === "engineResume") {
-      const fallbackPayload = {
+    if (!nativeAttempt.ok && (action === "engineStop" || action === "engineResume")) {
+      const fallbackAttempt = await postCommandAttempt(cookie, "fallback-command", {
         deviceId,
         type: "command",
         description: `TeleGuardia ${action}`,
         data: { command: action },
-      };
-
-      console.log(`[Traccar] Fallback POST /commands → type=command, data.command=${action}`);
-      const res2 = await fetch(`${TRACCAR_API}/commands`, {
-        method: "POST",
-        headers: { Cookie: cookie, "Content-Type": "application/json" },
-        body: JSON.stringify(fallbackPayload),
       });
-
-      const body2 = await res2.text();
-      console.log(`[Traccar] Fallback response: ${res2.status} ${body2}`);
-
-      if (res2.ok) {
-        return { success: true, response: body2 };
-      }
-
-      return { success: false, error: `Native: ${res1.status} ${body1} | Fallback: ${res2.status} ${body2}` };
+      attempts.push(fallbackAttempt);
     }
 
-    return { success: false, error: `${res1.status}: ${body1}` };
+    if (action === "engineStop" || action === "engineResume") {
+      const relayCommand = action === "engineStop" ? "RELAY,1#" : "RELAY,0#";
+      const customRelayAttempt = await postCommandAttempt(cookie, "custom-relay", {
+        deviceId,
+        type: "custom",
+        textChannel: false,
+        description: `TeleGuardia ${action} relay`,
+        attributes: { data: relayCommand },
+      });
+      attempts.push(customRelayAttempt);
+    }
+
+    const successful = attempts.filter((a) => a.ok);
+    if (successful.length > 0) {
+      return {
+        success: true,
+        response: successful.map((a) => `${a.name}:${a.status}`).join(", "),
+        attempts,
+      };
+    }
+
+    return {
+      success: false,
+      error: attempts.map((a) => `${a.name}:${a.status} ${a.body}`).join(" | "),
+      attempts,
+    };
   } catch (err) {
     console.error(`[Traccar] Error:`, err);
-    return { success: false, error: err instanceof Error ? err.message : "API request failed" };
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "API request failed",
+      attempts: [],
+    };
   }
 }
 
 function getSupabase() {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 }
 
-// Normalize phone: keep only digits
 function normalizePhone(phone: string): string {
   return (phone || "").replace(/\D/g, "");
 }
 
-// Match phones flexibly (suffix match)
 function phonesMatch(a: string, b: string): boolean {
   if (!a || !b) return false;
   return a === b || a.endsWith(b) || b.endsWith(a);
+}
+
+function normalizeParcel(parcel: string): string {
+  return (parcel || "").trim().toLowerCase();
 }
 
 Deno.serve(async (req) => {
@@ -140,11 +171,10 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { alarm_type, imei, action, phone_number } = body;
+    const { alarm_type, imei, action, alarm_id } = body;
 
     const cookie = await traccarLogin();
 
-    // ── Manual actions (engineStop, engineResume, nosleep by IMEI) ──
     if (action && imei) {
       const deviceId = await findDeviceId(cookie, imei);
       if (!deviceId) {
@@ -161,14 +191,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Alarm trigger: resolve parcel from phone number ──
     const supabase = getSupabase();
-    const senderPhone = normalizePhone(phone_number || body.phone_number || "");
-    const clientParcel = (body.parcel_name || "").trim().toLowerCase();
+
+    let alarmPhone = "";
+    let alarmParcel = "";
+
+    if (alarm_id) {
+      const { data: alarmRow } = await supabase
+        .from("alarms")
+        .select("phone_number, parcel_name")
+        .eq("id", alarm_id)
+        .maybeSingle();
+
+      alarmPhone = alarmRow?.phone_number || "";
+      alarmParcel = alarmRow?.parcel_name || "";
+    }
+
+    const senderPhone = normalizePhone(body.phone_number || alarmPhone || "");
+    const clientParcel = normalizeParcel(body.parcel_name || alarmParcel || "");
 
     console.log(`[GPS] Alarm triggered. phone="${senderPhone}", client_parcel="${clientParcel}", type="${alarm_type}"`);
 
-    // Step 1: Resolve parcel from registered_numbers by phone
     let resolvedParcel: string | null = null;
 
     if (senderPhone) {
@@ -183,27 +226,27 @@ Deno.serve(async (req) => {
         });
 
         if (match) {
-          resolvedParcel = (match.parcel_name || "").trim().toLowerCase();
-          console.log(`[GPS] Phone ${senderPhone} → parcel "${match.parcel_name}" (normalized: "${resolvedParcel}")`);
+          resolvedParcel = normalizeParcel(match.parcel_name || "");
+          console.log(`[GPS] Phone ${senderPhone} -> parcel "${match.parcel_name}" (normalized: "${resolvedParcel}")`);
         } else {
           console.log(`[GPS] Phone ${senderPhone} not found in registered_numbers`);
         }
       }
     }
 
-    // Fallback to client-provided parcel if phone lookup failed
     const finalParcel = resolvedParcel || clientParcel;
 
     if (!finalParcel) {
-      console.log(`[GPS] No parcel resolved. phone="${senderPhone}", client_parcel="${clientParcel}"`);
       return new Response(JSON.stringify({
         success: false,
         reason: "no_parcel_resolved",
         message: "No se pudo determinar la parcela del remitente",
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Step 2: Find GPS devices for the resolved parcel
     const { data: allDevices, error: dbError } = await supabase
       .from("gps_devices")
       .select("imei, relay_duration, relay_active_until, parcel_name");
@@ -211,12 +254,13 @@ Deno.serve(async (req) => {
     if (dbError) {
       console.error("[GPS] DB error:", dbError);
       return new Response(JSON.stringify({ success: false, reason: "db_error", error: dbError.message }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const targetDevices = (allDevices || []).filter((d: any) =>
-      (d.parcel_name || "").trim().toLowerCase() === finalParcel
+      normalizeParcel(d.parcel_name || "") === finalParcel,
     );
 
     console.log(`[GPS] Parcel: "${finalParcel}" | Total devices: ${allDevices?.length || 0} | Matched: ${targetDevices.length}`);
@@ -226,10 +270,12 @@ Deno.serve(async (req) => {
         success: false,
         reason: "no_devices_for_parcel",
         message: `No hay dispositivos GPS para la parcela "${finalParcel}"`,
-      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Step 3: Send engineStop to each device and create persistent relay job
     const now = new Date();
     const results: any[] = [];
 
@@ -243,22 +289,30 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Send engineStop
-      console.log(`[GPS] Sending engineStop → IMEI=${device.imei}, duration=${duration}s`);
+      console.log(`[GPS] Sending engineStop -> IMEI=${device.imei}, duration=${duration}s`);
       const stopResult = await sendDeviceCommand(cookie, traccarDeviceId, "engineStop");
 
       if (!stopResult.success) {
-        results.push({ imei: device.imei, success: false, error: stopResult.error });
+        results.push({ imei: device.imei, success: false, error: stopResult.error, attempts: stopResult.attempts });
         continue;
       }
 
-      // Update relay_active_until
       await supabase
         .from("gps_devices")
         .update({ relay_active_until: executeAt.toISOString() })
         .eq("imei", device.imei);
 
-      // Create persistent job for engineResume
+      await supabase
+        .from("gps_relay_jobs")
+        .update({
+          status: "cancelled",
+          completed_at: new Date().toISOString(),
+          error_message: "Reemplazado por una alarma más reciente",
+        })
+        .eq("imei", device.imei)
+        .eq("action", "engineResume")
+        .in("status", ["pending", "processing"]);
+
       const { error: jobError } = await supabase
         .from("gps_relay_jobs")
         .insert({
@@ -267,6 +321,7 @@ Deno.serve(async (req) => {
           action: "engineResume",
           status: "pending",
           execute_at: executeAt.toISOString(),
+          alarm_id: alarm_id || null,
         });
 
       if (jobError) {
@@ -280,33 +335,8 @@ Deno.serve(async (req) => {
         success: true,
         relay_duration: duration,
         resume_at: executeAt.toISOString(),
+        attempts: stopResult.attempts,
       });
-
-      // Also try inline setTimeout as backup (may not survive if runtime dies)
-      setTimeout(async () => {
-        try {
-          console.log(`[GPS] Inline resume timer fired for ${device.imei}`);
-          const freshCookie = await traccarLogin();
-          const devId = await findDeviceId(freshCookie, device.imei);
-          if (devId) {
-            await sendDeviceCommand(freshCookie, devId, "engineResume");
-            console.log(`[GPS] ✓ Inline engineResume sent for ${device.imei}`);
-          }
-          // Mark job as done
-          await supabase
-            .from("gps_relay_jobs")
-            .update({ status: "completed", completed_at: new Date().toISOString() })
-            .eq("imei", device.imei)
-            .eq("status", "pending");
-          // Clear relay_active_until
-          await supabase
-            .from("gps_devices")
-            .update({ relay_active_until: null })
-            .eq("imei", device.imei);
-        } catch (e) {
-          console.error(`[GPS] Inline resume error for ${device.imei}:`, e);
-        }
-      }, duration * 1000);
     }
 
     return new Response(JSON.stringify({
@@ -324,6 +354,9 @@ Deno.serve(async (req) => {
     console.error("[GPS] Error:", err);
     return new Response(JSON.stringify({
       error: err instanceof Error ? err.message : "Error interno",
-    }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

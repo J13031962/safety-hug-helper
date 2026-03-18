@@ -7,6 +7,13 @@ const corsHeaders = {
 
 const TRACCAR_API = Deno.env.get("TRACCAR_API_URL") || "https://gps.smarturban.co/api";
 
+type CommandAttemptResult = {
+  name: string;
+  ok: boolean;
+  status: number;
+  body: string;
+};
+
 async function traccarLogin(): Promise<string> {
   const email = Deno.env.get("TRACCAR_EMAIL")!;
   const password = Deno.env.get("TRACCAR_PASSWORD")!;
@@ -29,33 +36,69 @@ async function traccarLogin(): Promise<string> {
   return `JSESSIONID=${jsessionid}`;
 }
 
+async function postCommandAttempt(
+  cookie: string,
+  name: string,
+  payload: Record<string, unknown>,
+): Promise<CommandAttemptResult> {
+  const res = await fetch(`${TRACCAR_API}/commands`, {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await res.text();
+  console.log(`[Worker] Attempt ${name} -> ${res.status} ${body}`);
+
+  return {
+    name,
+    ok: res.ok,
+    status: res.status,
+    body,
+  };
+}
+
 async function sendCommand(cookie: string, deviceId: number, action: string): Promise<boolean> {
-  // Try native type first
-  const res1 = await fetch(`${TRACCAR_API}/commands`, {
-    method: "POST",
-    headers: { Cookie: cookie, "Content-Type": "application/json" },
-    body: JSON.stringify({ deviceId, type: action, description: `TeleGuardia ${action}`, attributes: {} }),
+  const attempts: CommandAttemptResult[] = [];
+
+  const nativeAttempt = await postCommandAttempt(cookie, "native", {
+    deviceId,
+    type: action,
+    description: `TeleGuardia ${action}`,
+    attributes: {},
   });
-  const body1 = await res1.text();
-  if (res1.ok) {
-    console.log(`[Worker] ✓ ${action} sent to device ${deviceId}: ${body1}`);
-    return true;
+  attempts.push(nativeAttempt);
+
+  if (!nativeAttempt.ok && (action === "engineStop" || action === "engineResume")) {
+    const fallbackAttempt = await postCommandAttempt(cookie, "fallback-command", {
+      deviceId,
+      type: "command",
+      description: `TeleGuardia ${action}`,
+      data: { command: action },
+    });
+    attempts.push(fallbackAttempt);
   }
 
-  // Fallback
-  const res2 = await fetch(`${TRACCAR_API}/commands`, {
-    method: "POST",
-    headers: { Cookie: cookie, "Content-Type": "application/json" },
-    body: JSON.stringify({ deviceId, type: "command", description: `TeleGuardia ${action}`, data: { command: action } }),
-  });
-  const body2 = await res2.text();
-  if (res2.ok) {
-    console.log(`[Worker] ✓ ${action} (fallback) sent to device ${deviceId}: ${body2}`);
-    return true;
+  if (action === "engineStop" || action === "engineResume") {
+    const relayCommand = action === "engineStop" ? "RELAY,1#" : "RELAY,0#";
+    const customAttempt = await postCommandAttempt(cookie, "custom-relay", {
+      deviceId,
+      type: "custom",
+      textChannel: false,
+      description: `TeleGuardia ${action} relay`,
+      attributes: { data: relayCommand },
+    });
+    attempts.push(customAttempt);
   }
 
-  console.error(`[Worker] ✗ ${action} failed for device ${deviceId}: ${res1.status} / ${res2.status}`);
-  return false;
+  const success = attempts.some((a) => a.ok);
+  if (success) {
+    console.log(`[Worker] ✓ ${action} sent to device ${deviceId}`);
+  } else {
+    console.error(`[Worker] ✗ ${action} failed for device ${deviceId}: ${attempts.map((a) => `${a.name}:${a.status}`).join(" | ")}`);
+  }
+
+  return success;
 }
 
 Deno.serve(async (req) => {
@@ -66,55 +109,79 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // Find pending jobs whose execute_at has passed
     const now = new Date().toISOString();
     const { data: jobs, error } = await supabase
       .from("gps_relay_jobs")
-      .select("*")
+      .select("id, imei, device_id_traccar, action, execute_at, status")
       .eq("status", "pending")
       .lte("execute_at", now)
+      .order("execute_at", { ascending: true })
       .limit(20);
 
     if (error) {
       console.error("[Worker] DB error:", error);
       return new Response(JSON.stringify({ error: error.message }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (!jobs || jobs.length === 0) {
-      return new Response(JSON.stringify({ processed: 0 }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!jobs?.length) {
+      console.log("[Worker] No pending relay jobs");
+      return new Response(JSON.stringify({ processed: 0, total: 0 }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     console.log(`[Worker] Processing ${jobs.length} pending relay jobs`);
+
     const cookie = await traccarLogin();
     let processed = 0;
 
     for (const job of jobs) {
-      // Mark as processing
-      await supabase
+      const { data: markedRows, error: markError } = await supabase
         .from("gps_relay_jobs")
         .update({ status: "processing" })
-        .eq("id", job.id);
+        .eq("id", job.id)
+        .eq("status", "pending")
+        .select("id");
+
+      if (markError) {
+        console.error(`[Worker] Failed to mark job ${job.id} as processing:`, markError.message);
+        continue;
+      }
+
+      if (!markedRows?.length) {
+        continue;
+      }
 
       const success = await sendCommand(cookie, job.device_id_traccar, job.action);
 
       if (success) {
         await supabase
           .from("gps_relay_jobs")
-          .update({ status: "completed", completed_at: new Date().toISOString() })
+          .update({ status: "completed", completed_at: new Date().toISOString(), error_message: null })
           .eq("id", job.id);
 
-        // Clear relay_active_until
-        await supabase
-          .from("gps_devices")
-          .update({ relay_active_until: null })
-          .eq("imei", job.imei);
+        const { data: newerJobs } = await supabase
+          .from("gps_relay_jobs")
+          .select("id")
+          .eq("imei", job.imei)
+          .eq("action", "engineResume")
+          .in("status", ["pending", "processing"])
+          .gt("execute_at", job.execute_at)
+          .limit(1);
+
+        if (!newerJobs?.length) {
+          await supabase
+            .from("gps_devices")
+            .update({ relay_active_until: null })
+            .eq("imei", job.imei);
+        }
 
         processed++;
       } else {
@@ -128,12 +195,14 @@ Deno.serve(async (req) => {
     console.log(`[Worker] Done. Processed: ${processed}/${jobs.length}`);
 
     return new Response(JSON.stringify({ processed, total: jobs.length }), {
-      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("[Worker] Error:", err);
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
