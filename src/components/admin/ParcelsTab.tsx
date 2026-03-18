@@ -61,6 +61,7 @@ export default function ParcelsTab() {
     const payload = {
       name: form.name.trim(),
       whatsapp_group_id: form.whatsapp_group_id.trim() || null,
+      whatsapp_invite_link: form.whatsapp_invite_link.trim() || null,
     };
 
     if (editing) {
