@@ -163,7 +163,10 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       setAddress(geo.full);
     }
 
+    const alarmId = crypto.randomUUID();
+
     const alarmData = {
+      id: alarmId,
       alarm_type: type,
       sender_name: settings.senderName || "Usuario",
       phone_number: settings.phoneNumber || "",
@@ -174,14 +177,17 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       address: finalAddress || null,
     };
 
-    const { data: createdAlarm, error } = await supabase
+    const { error } = await supabase
       .from("alarms")
-      .insert(alarmData)
-      .select("id, phone_number, parcel_name")
-      .single();
+      .insert(alarmData);
 
-    if (error || !createdAlarm) {
-      toast({ title: "Error", description: "No se pudo enviar la alerta", variant: "destructive" });
+    if (error) {
+      console.error("[ALARM] Insert failed:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo enviar la alerta",
+        variant: "destructive",
+      });
       setState("confirm");
       return;
     }
@@ -201,10 +207,10 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     try {
       const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
         body: {
-          alarm_id: createdAlarm.id,
+          alarm_id: alarmId,
           alarm_type: type,
-          phone_number: createdAlarm.phone_number || settings.phoneNumber || "",
-          parcel_name: createdAlarm.parcel_name || settings.parcelName || "",
+          phone_number: alarmData.phone_number,
+          parcel_name: alarmData.parcel_name,
         },
       });
       if (gpsErr) {
