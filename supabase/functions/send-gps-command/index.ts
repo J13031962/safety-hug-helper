@@ -311,19 +311,7 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      console.log(`[GPS] Sending engineStop -> IMEI=${device.imei}, duration=${duration}s`);
-      const stopResult = await sendDeviceCommand(cookie, traccarDeviceId, "engineStop");
-
-      if (!stopResult.success) {
-        results.push({ imei: device.imei, success: false, error: stopResult.error, attempts: stopResult.attempts });
-        continue;
-      }
-
-      await supabase
-        .from("gps_devices")
-        .update({ relay_active_until: executeAt.toISOString() })
-        .eq("imei", device.imei);
-
+      // Cancel old jobs FIRST to prevent race condition with cron worker
       await supabase
         .from("gps_relay_jobs")
         .update({
@@ -334,6 +322,20 @@ Deno.serve(async (req) => {
         .eq("imei", device.imei)
         .eq("action", "engineResume")
         .in("status", ["pending", "processing"]);
+
+      // Update relay_active_until BEFORE sending command
+      await supabase
+        .from("gps_devices")
+        .update({ relay_active_until: executeAt.toISOString() })
+        .eq("imei", device.imei);
+
+      console.log(`[GPS] Sending engineStop -> IMEI=${device.imei}, duration=${duration}s`);
+      const stopResult = await sendDeviceCommand(cookie, traccarDeviceId, "engineStop");
+
+      if (!stopResult.success) {
+        results.push({ imei: device.imei, success: false, error: stopResult.error, attempts: stopResult.attempts });
+        continue;
+      }
 
       const { error: jobError } = await supabase
         .from("gps_relay_jobs")

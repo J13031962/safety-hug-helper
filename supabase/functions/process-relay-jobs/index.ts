@@ -181,6 +181,28 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      // Before sending engineResume, check if a newer alarm extended the relay
+      if (job.action === "engineResume") {
+        const { data: deviceRow } = await supabase
+          .from("gps_devices")
+          .select("relay_active_until")
+          .eq("imei", job.imei)
+          .maybeSingle();
+
+        if (deviceRow?.relay_active_until) {
+          const activeUntil = new Date(deviceRow.relay_active_until);
+          const jobExecuteAt = new Date(job.execute_at);
+          if (activeUntil > jobExecuteAt) {
+            console.log(`[Worker] Skipping job ${job.id}: relay extended to ${deviceRow.relay_active_until}`);
+            await supabase
+              .from("gps_relay_jobs")
+              .update({ status: "cancelled", completed_at: new Date().toISOString(), error_message: "Relay extendido por alarma más reciente" })
+              .eq("id", job.id);
+            continue;
+          }
+        }
+      }
+
       const success = await sendCommand(cookie, job.device_id_traccar, job.action);
 
       if (success) {
