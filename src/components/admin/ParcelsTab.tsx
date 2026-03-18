@@ -212,6 +212,11 @@ export default function ParcelsTab() {
               <Input value={form.whatsapp_group_id} onChange={(e) => setForm(f => ({ ...f, whatsapp_group_id: e.target.value }))} placeholder="Ej: 120363407230255450@g.us" className="font-mono text-sm" />
               <p className="text-xs text-muted-foreground">Puedes obtenerlo con el botón de vincular grupo después de crear la parcela.</p>
             </div>
+            <div className="space-y-2">
+              <Label>Enlace de invitación WhatsApp (opcional)</Label>
+              <Input value={form.whatsapp_invite_link} onChange={(e) => setForm(f => ({ ...f, whatsapp_invite_link: e.target.value }))} placeholder="https://chat.whatsapp.com/XXXXXX" className="text-sm" />
+              <p className="text-xs text-muted-foreground">Este enlace aparecerá en el mensaje de alarma para que los vecinos puedan unirse al chat.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
