@@ -48,7 +48,7 @@ export default function ParcelsTab() {
 
   const openEdit = (p: Parcel) => {
     setEditing(p);
-    setForm({ name: p.name, whatsapp_group_id: p.whatsapp_group_id || "" });
+    setForm({ name: p.name, whatsapp_group_id: p.whatsapp_group_id || "", whatsapp_invite_link: p.whatsapp_invite_link || "" });
     setDialogOpen(true);
   };
 
