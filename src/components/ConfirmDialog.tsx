@@ -174,9 +174,13 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       address: finalAddress || null,
     };
 
-    const { error } = await supabase.from("alarms").insert(alarmData);
+    const { data: createdAlarm, error } = await supabase
+      .from("alarms")
+      .insert(alarmData)
+      .select("id, phone_number, parcel_name")
+      .single();
 
-    if (error) {
+    if (error || !createdAlarm) {
       toast({ title: "Error", description: "No se pudo enviar la alerta", variant: "destructive" });
       setState("confirm");
       return;
@@ -196,7 +200,12 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     let gpsWarning: string | null = null;
     try {
       const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
-        body: { alarm_type: type, phone_number: settings.phoneNumber || "", parcel_name: settings.parcelName || "" },
+        body: {
+          alarm_id: createdAlarm.id,
+          alarm_type: type,
+          phone_number: createdAlarm.phone_number || settings.phoneNumber || "",
+          parcel_name: createdAlarm.parcel_name || settings.parcelName || "",
+        },
       });
       if (gpsErr) {
         console.warn("[GPS] Error activando dispositivos:", gpsErr);
@@ -204,14 +213,9 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       } else if (gpsData?.success === false) {
         console.warn("[GPS] No devices found:", gpsData.reason, gpsData.message);
         if (gpsData.reason === "no_devices_for_parcel") {
-          gpsWarning = `No hay dispositivos GPS registrados para "${settings.parcelName}".`;
+          gpsWarning = `No hay dispositivos GPS registrados para "${gpsData.parcel_resolved || settings.parcelName || "tu parcela"}".`;
         } else {
           gpsWarning = gpsData.message || "No se pudo activar la sirena GPS.";
-        }
-      } else if (gpsData?.results) {
-        const extended = gpsData.results.filter((r: any) => r.action === "extended");
-        if (extended.length > 0 && gpsData.results.length === extended.length) {
-          toast({ title: "🔊 Sirena ya activa", description: "La sirena ya está sonando. Se extendió el tiempo." });
         }
       }
     } catch (gpsEx) {
