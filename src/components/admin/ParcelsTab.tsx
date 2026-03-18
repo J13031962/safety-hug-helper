@@ -13,6 +13,7 @@ interface Parcel {
   id: string;
   name: string;
   whatsapp_group_id: string | null;
+  whatsapp_invite_link: string | null;
   created_at: string;
 }
 
