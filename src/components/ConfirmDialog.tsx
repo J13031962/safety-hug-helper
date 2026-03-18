@@ -163,7 +163,10 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       setAddress(geo.full);
     }
 
+    const alarmId = crypto.randomUUID();
+
     const alarmData = {
+      id: alarmId,
       alarm_type: type,
       sender_name: settings.senderName || "Usuario",
       phone_number: settings.phoneNumber || "",
@@ -174,14 +177,17 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       address: finalAddress || null,
     };
 
-    const { data: createdAlarm, error } = await supabase
+    const { error } = await supabase
       .from("alarms")
-      .insert(alarmData)
-      .select("id, phone_number, parcel_name")
-      .single();
+      .insert(alarmData);
 
-    if (error || !createdAlarm) {
-      toast({ title: "Error", description: "No se pudo enviar la alerta", variant: "destructive" });
+    if (error) {
+      console.error("[ALARM] Insert failed:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo enviar la alerta",
+        variant: "destructive",
+      });
       setState("confirm");
       return;
     }
