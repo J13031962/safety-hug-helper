@@ -215,7 +215,7 @@ Deno.serve(async (req) => {
           .from("gps_relay_jobs")
           .select("id")
           .eq("imei", job.imei)
-          .eq("action", "engineResume")
+          .eq("action", "engineStop")
           .in("status", ["pending", "processing"])
           .gt("execute_at", job.execute_at)
           .limit(1);

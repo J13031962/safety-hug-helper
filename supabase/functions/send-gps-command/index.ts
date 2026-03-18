@@ -352,14 +352,14 @@ Deno.serve(async (req) => {
         console.error(`[GPS] Failed creating relay job for ${device.imei}:`, jobError.message);
       }
 
-      console.log(`[GPS] ✓ engineStop sent, engineResume scheduled at ${executeAt.toISOString()} (${duration}s)`);
+      console.log(`[GPS] ✓ engineResume sent (siren ON), engineStop scheduled at ${executeAt.toISOString()} (${duration}s)`);
 
       results.push({
         imei: device.imei,
         success: true,
         relay_duration: duration,
-        resume_at: executeAt.toISOString(),
-        attempts: stopResult.attempts,
+        stop_at: executeAt.toISOString(),
+        attempts: resumeResult.attempts,
       });
     }
 
