@@ -14,9 +14,9 @@ Custom GPS server configuration and API details
 - GET /api/devices/{id} (get device status)
 - POST /api/commands (send command to device)
 
-## Commands (CORRECT format - VERIFIED WORKING)
-- Payload: `{ deviceId, type: "command", data: { command: "engineStop" | "engineResume" }, description: "..." }`
-- DO NOT use `type: "engineStop"` directly — must be `type: "command"` with `data.command`
+## Commands
+- Preferred for relay: `{ deviceId, type: "engineStop" | "engineResume", attributes: {}, description: "..." }`
+- Fallback compatibility: `{ deviceId, type: "command", data: { command: "engineStop" | "engineResume" }, description: "..." }`
 - engineStop → Cortar combustible / activar relay (siren sounds)
 - engineResume → Restaurar combustible / desactivar relay (siren stops)
 

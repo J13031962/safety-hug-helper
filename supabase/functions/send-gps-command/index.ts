@@ -59,33 +59,58 @@ async function sendDeviceCommand(
   action: DeviceAction
 ): Promise<{ success: boolean; response?: string; error?: string }> {
   try {
-    const payload = {
-      deviceId,
-      type: "command",
-      description: `TeleGuardia ${action}`,
-      data: { command: action },
-    };
+    const payloads: any[] = (action === "engineStop" || action === "engineResume")
+      ? [
+          {
+            deviceId,
+            type: action,
+            description: `TeleGuardia ${action}`,
+            attributes: {},
+          },
+          {
+            deviceId,
+            type: "command",
+            description: `TeleGuardia ${action}`,
+            data: { command: action },
+          },
+        ]
+      : [
+          {
+            deviceId,
+            type: "command",
+            description: `TeleGuardia ${action}`,
+            data: { command: action },
+          },
+        ];
 
-    console.log(`[Traccar] POST /commands → deviceId=${deviceId}, command=${action}`);
-    console.log(`[Traccar] Payload: ${JSON.stringify(payload)}`);
+    let lastError: string | undefined;
 
-    const res = await fetch(`${TRACCAR_API}/commands`, {
-      method: "POST",
-      headers: {
-        Cookie: cookie,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    for (let i = 0; i < payloads.length; i++) {
+      const payload = payloads[i];
+      console.log(`[Traccar] POST /commands (attempt ${i + 1}/${payloads.length}) → deviceId=${deviceId}, action=${action}, type=${payload.type}`);
+      console.log(`[Traccar] Payload: ${JSON.stringify(payload)}`);
 
-    const body = await res.text();
-    console.log(`[Traccar] Response status: ${res.status}, Body: ${body}`);
+      const res = await fetch(`${TRACCAR_API}/commands`, {
+        method: "POST",
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
-    if (!res.ok) {
-      return { success: false, error: `HTTP ${res.status}: ${body}` };
+      const body = await res.text();
+      console.log(`[Traccar] Response status: ${res.status}, Body: ${body}`);
+
+      if (res.ok) {
+        return { success: true, response: body };
+      }
+
+      lastError = `HTTP ${res.status}: ${body}`;
+      console.warn(`[Traccar] Attempt ${i + 1} failed: ${lastError}`);
     }
 
-    return { success: true, response: body };
+    return { success: false, error: lastError || "Command rejected by Traccar" };
   } catch (err) {
     console.error(`[Traccar] Error:`, err);
     return { success: false, error: err instanceof Error ? err.message : "API request failed" };
