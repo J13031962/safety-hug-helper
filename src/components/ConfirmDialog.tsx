@@ -207,10 +207,10 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     try {
       const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
         body: {
-          alarm_id: createdAlarm.id,
+          alarm_id: alarmId,
           alarm_type: type,
-          phone_number: createdAlarm.phone_number || settings.phoneNumber || "",
-          parcel_name: createdAlarm.parcel_name || settings.parcelName || "",
+          phone_number: alarmData.phone_number,
+          parcel_name: alarmData.parcel_name,
         },
       });
       if (gpsErr) {
