@@ -153,6 +153,7 @@ export default function ParcelsTab() {
               <TableRow>
                 <TableHead>Parcela</TableHead>
                 <TableHead>Grupo WhatsApp ID</TableHead>
+                <TableHead>Enlace de invitación</TableHead>
                 <TableHead className="w-32">Acciones</TableHead>
               </TableRow>
             </TableHeader>
