@@ -1,39 +1,36 @@
 
 
-## Plan: Corregir duración del relay y resolución de parcela
+## Plan: Dar permisos de administrador al rol `director_monitoreo`
 
-### Problema raíz
+### Cambios necesarios
 
-En `send-gps-command/index.ts`, línea 259:
-```
-const finalParcel = resolvedParcel || clientParcel;
-```
+#### 1. Frontend — `src/pages/AdminPanel.tsx`
+- Cambiar las verificaciones `role !== "admin"` para aceptar también `director_monitoreo`
+- Línea 20: `if (!loading && (!user || (role !== "admin" && role !== "director_monitoreo")))`
+- Línea 33: misma condición
 
-Cuando un usuario está registrado en múltiples parcelas, `regNumbers.find()` (línea 245) devuelve el **primer** registro del teléfono en la base de datos, ignorando la parcela que el usuario seleccionó en la app. Esto causa:
+#### 2. Frontend — `src/pages/Plataforma.tsx`
+- Agregar `director_monitoreo` a la condición que redirige a `/admin` (línea 17):
+  `if (role === "admin" || role === "director_monitoreo")`
 
-1. **Se activan los GPS de la parcela equivocada** — si la primera fila en BD es "Loop" pero el usuario seleccionó "La Selva", se activan los dispositivos de "Loop"
-2. **La duración del relay parece no cambiar** — porque se están activando dispositivos de otra parcela que tienen 30s por defecto
+#### 3. Edge Functions — Autorización del caller
+Los 3 edge functions verifican que el caller sea admin. Se debe ampliar para aceptar `director_monitoreo`:
 
-### Cambio necesario
+- **`supabase/functions/create-user/index.ts`**: Cambiar query de roles para buscar `role IN ('admin', 'director_monitoreo')`
+- **`supabase/functions/update-user/index.ts`**: Igual
+- **`supabase/functions/delete-user/index.ts`**: Igual
 
-**Archivo: `supabase/functions/send-gps-command/index.ts`**
+#### 4. RLS Policies — Base de datos
+Las políticas de INSERT/UPDATE/DELETE en `gps_devices`, `user_roles`, `parcels` y `registered_numbers` solo permiten `admin`. Se deben agregar políticas adicionales (o modificar las existentes) para incluir `director_monitoreo`:
 
-Invertir la prioridad de resolución de parcela: **preferir la parcela enviada por el cliente** (`clientParcel`) sobre la resuelta por teléfono (`resolvedParcel`). Solo usar la búsqueda por teléfono como fallback.
+- `gps_devices`: insert, update, delete
+- `parcels`: manage (ALL)
+- `user_roles`: insert, update, delete
+- `registered_numbers`: insert, update, delete
 
-Cambiar línea 259 de:
-```typescript
-const finalParcel = resolvedParcel || clientParcel;
-```
-a:
-```typescript
-const finalParcel = clientParcel || resolvedParcel;
-```
+Se crearán nuevas políticas permisivas con `has_role(auth.uid(), 'director_monitoreo')` para cada tabla/operación afectada.
 
-Además, validar que el teléfono esté registrado en esa parcela específica (seguridad): buscar un match que coincida tanto en teléfono como en parcela cuando `clientParcel` está presente.
-
-### Resultado
-
-- Si el usuario selecciona "La Selva", se activan solo los GPS de "La Selva" con su duración configurada
-- Si el usuario cambia a "Loop", se activan solo los GPS de "Loop"
-- La duración del relay respetará el valor configurado en cada dispositivo GPS
+### Sin cambios
+- No se modifica el esquema de tablas
+- El rol `director_monitoreo` ya existe en el enum `app_role`
 
