@@ -17,7 +17,7 @@ export default function AdminPanel() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && (!user || role !== "admin")) {
+    if (!loading && (!user || (role !== "admin" && role !== "director_monitoreo"))) {
       navigate("/login");
     }
   }, [loading, user, role, navigate]);
