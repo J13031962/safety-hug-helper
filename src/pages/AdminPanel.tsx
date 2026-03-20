@@ -30,7 +30,7 @@ export default function AdminPanel() {
     );
   }
 
-  if (!user || role !== "admin") return null;
+  if (!user || (role !== "admin" && role !== "director_monitoreo")) return null;
 
   return (
     <div className="min-h-screen bg-background">
