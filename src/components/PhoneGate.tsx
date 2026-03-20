@@ -51,24 +51,34 @@ export default function PhoneGate({ children }: PhoneGateProps) {
         .from("registered_numbers")
         .select("phone_number, owner_name, house_number, parcel_name");
 
-    const match = allNumbers?.find((r) => {
+    const matches = allNumbers?.filter((r) => {
         const rd = normalizeDigits(r.phone_number);
         return rd === digits || rd.endsWith(digits) || digits.endsWith(rd);
-      }) as RegisteredUser | undefined;
+      }) as RegisteredUser[] | undefined;
 
-      if (!match) {
+      if (!matches || matches.length === 0) {
         setError("Este número no está registrado. Contacte al administrador.");
         setChecking(false);
         return;
       }
 
+      // Build parcels array from all matches
+      const parcels = matches.map((m) => ({
+        parcelName: m.parcel_name || "",
+        houseNumber: m.house_number || "",
+        ownerName: m.owner_name,
+      }));
+
+      const first = parcels[0];
+
       // Save to localStorage so ConfirmDialog and the app can use it
       const settings = {
         phoneNumber: phone.trim(),
-        senderName: match.owner_name,
-        houseNumber: match.house_number || "",
-        parcelName: match.parcel_name || "",
+        senderName: first.ownerName,
+        houseNumber: first.houseNumber,
+        parcelName: first.parcelName,
         phoneVerified: true,
+        parcels,
       };
       localStorage.setItem("sosalerta_settings", JSON.stringify(settings));
       setVerified(true);
