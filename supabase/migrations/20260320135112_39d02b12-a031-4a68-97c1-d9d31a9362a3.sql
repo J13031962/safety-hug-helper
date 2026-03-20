@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS registered_numbers_phone_unique_except_admin;
+CREATE UNIQUE INDEX registered_numbers_phone_parcel_unique ON public.registered_numbers USING btree (phone_number, parcel_name) WHERE (phone_number !~~ '%3332840057%'::text);
