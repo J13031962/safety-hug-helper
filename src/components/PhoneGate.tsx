@@ -22,16 +22,45 @@ export default function PhoneGate({ children }: PhoneGateProps) {
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if already verified on mount
+  // Check if already verified on mount - re-fetch parcels if missing
   useEffect(() => {
     const saved = localStorage.getItem("sosalerta_settings");
     if (saved) {
       const settings = JSON.parse(saved);
       if (settings.phoneVerified && settings.phoneNumber) {
-        setVerified(true);
+        if (settings.parcels) {
+          setVerified(true);
+          setLoading(false);
+        } else {
+          // Old format without parcels - re-fetch
+          const digits = settings.phoneNumber.replace(/\D/g, "");
+          supabase
+            .from("registered_numbers")
+            .select("phone_number, owner_name, house_number, parcel_name")
+            .then(({ data }) => {
+              const matches = data?.filter((r) => {
+                const rd = r.phone_number.replace(/\D/g, "");
+                return rd === digits || rd.endsWith(digits) || digits.endsWith(rd);
+              });
+              if (matches && matches.length > 0) {
+                const parcels = matches.map((m) => ({
+                  parcelName: m.parcel_name || "",
+                  houseNumber: m.house_number || "",
+                  ownerName: m.owner_name,
+                }));
+                const updated = { ...settings, parcels, parcelName: parcels[0].parcelName, houseNumber: parcels[0].houseNumber, senderName: parcels[0].ownerName };
+                localStorage.setItem("sosalerta_settings", JSON.stringify(updated));
+              }
+              setVerified(true);
+              setLoading(false);
+            });
+        }
+      } else {
+        setLoading(false);
       }
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const normalizeDigits = (val: string) => val.replace(/\D/g, "");
