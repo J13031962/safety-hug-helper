@@ -242,21 +242,37 @@ Deno.serve(async (req) => {
         .select("phone_number, parcel_name");
 
       if (regNumbers) {
-        const match = regNumbers.find((r: any) => {
-          const regDigits = normalizePhone(r.phone_number);
-          return phonesMatch(regDigits, senderPhone);
-        });
+        // If clientParcel is set, validate the phone is registered in that specific parcel
+        if (clientParcel) {
+          const matchInParcel = regNumbers.find((r: any) => {
+            const regDigits = normalizePhone(r.phone_number);
+            return phonesMatch(regDigits, senderPhone) && normalizeParcel(r.parcel_name || "") === clientParcel;
+          });
 
-        if (match) {
-          resolvedParcel = normalizeParcel(match.parcel_name || "");
-          console.log(`[GPS] Phone ${senderPhone} -> parcel "${match.parcel_name}" (normalized: "${resolvedParcel}")`);
+          if (matchInParcel) {
+            console.log(`[GPS] Phone ${senderPhone} verified in parcel "${clientParcel}"`);
+          } else {
+            console.log(`[GPS] Phone ${senderPhone} NOT registered in parcel "${clientParcel}" — checking any parcel`);
+            const anyMatch = regNumbers.find((r: any) => phonesMatch(normalizePhone(r.phone_number), senderPhone));
+            if (!anyMatch) {
+              console.log(`[GPS] Phone ${senderPhone} not found in registered_numbers at all`);
+            }
+          }
         } else {
-          console.log(`[GPS] Phone ${senderPhone} not found in registered_numbers`);
+          // No clientParcel — fallback to first match
+          const match = regNumbers.find((r: any) => phonesMatch(normalizePhone(r.phone_number), senderPhone));
+          if (match) {
+            resolvedParcel = normalizeParcel(match.parcel_name || "");
+            console.log(`[GPS] Phone ${senderPhone} -> parcel "${match.parcel_name}" (fallback)`);
+          } else {
+            console.log(`[GPS] Phone ${senderPhone} not found in registered_numbers`);
+          }
         }
       }
     }
 
-    const finalParcel = resolvedParcel || clientParcel;
+    // PRIORITY: client-selected parcel first, DB lookup as fallback
+    const finalParcel = clientParcel || resolvedParcel;
 
     if (!finalParcel) {
       return new Response(JSON.stringify({
