@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
           .from("user_roles")
           .select("role")
           .eq("user_id", caller.id)
-          .eq("role", "admin");
+          .in("role", ["admin", "director_monitoreo"]);
         
         // Allow if caller is admin OR if no admins exist (first setup)
         const { count } = await supabaseAdmin
