@@ -24,7 +24,7 @@ export default function RegisteredNumbersTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<RegisteredNumber | null>(null);
-  const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_name: "" });
+  const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_names: [] as string[] });
   const [submitting, setSubmitting] = useState(false);
   const [showParcelSuggestions, setShowParcelSuggestions] = useState(false);
   const parcelRef = useRef<HTMLDivElement>(null);
