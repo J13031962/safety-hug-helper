@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", caller.id)
-      .eq("role", "admin");
+      .in("role", ["admin", "director_monitoreo"]);
 
     if (!roles || roles.length === 0) {
       return new Response(JSON.stringify({ error: "No autorizado" }), {

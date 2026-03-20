@@ -14,7 +14,7 @@ export default function Plataforma() {
       return;
     }
 
-    if (role === "admin") {
+    if (role === "admin" || role === "director_monitoreo") {
       navigate("/admin");
     } else if (role === "operator" || role === "supervisor_central" || role === "director_monitoreo") {
       navigate("/operador");
