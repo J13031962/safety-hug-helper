@@ -127,29 +127,13 @@ const IndexContent = () => {
 
         {hasMultipleParcels && (
           <div className="text-center">
-            <span className="text-xs text-muted-foreground">Parcelación activa:</span>
-            <p className="text-sm font-display font-bold text-foreground">{activeParcel.parcelName}</p>
+            <span className="text-xs text-muted-foreground">Parcelaciones registradas:</span>
+            <p className="text-sm font-display font-bold text-foreground">{parcels.map(p => p.parcelName).join(" • ")}</p>
           </div>
         )}
 
         <p className="text-muted-foreground text-sm">Presiona un botón para enviar alerta de emergencia</p>
         <EmergencyGrid onSelect={handleSelect} />
-
-        {hasMultipleParcels && (
-          <div className="flex flex-wrap justify-center gap-2 mt-2 w-full max-w-[280px]">
-            {parcels.map((p, i) =>
-              i !== activeParcelIndex ? (
-                <button
-                  key={i}
-                  onClick={() => switchParcel(i)}
-                  className="flex-1 min-w-[120px] px-4 py-3 rounded-xl border-2 border-border bg-background text-foreground font-display font-bold text-sm hover:border-emergency-panic/60 hover:bg-emergency-panic/10 transition-all active:scale-95"
-                >
-                  {p.parcelName}
-                </button>
-              ) : null
-            )}
-          </div>
-        )}
 
         <p className="text-xs text-muted-foreground mt-4">Las alertas se envían vía WhatsApp y activan las sirenas</p>
       </main>
@@ -159,6 +143,11 @@ const IndexContent = () => {
         type={selectedType}
         onClose={() => setDialogOpen(false)}
         initialLocation={locationRef.current}
+        parcels={parcels}
+        onParcelSelected={(parcel) => {
+          const idx = parcels.findIndex(p => p.parcelName === parcel.parcelName);
+          if (idx >= 0) setActiveParcelIndex(idx);
+        }}
       />
     </div>
   );
