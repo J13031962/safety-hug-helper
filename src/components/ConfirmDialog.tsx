@@ -56,6 +56,12 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
       return;
     }
 
+    // If multiple parcels, show selection first
+    const hasMultiple = parcels && parcels.length > 1;
+    if (hasMultiple) {
+      setState("select_parcel");
+    }
+
     const resolveAddress = async (lat: number, lng: number) => {
       const geo = await reverseGeocode(lat, lng);
       setAddress(geo.full);
