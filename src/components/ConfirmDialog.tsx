@@ -19,16 +19,24 @@ const alarmConfig: Record<AlarmType, { label: string; emoji: string; colorClass:
   disaster: { label: "DESASTRE", emoji: "🟡", colorClass: "text-emergency-disaster", bgClass: "bg-emergency-disaster" },
 };
 
+interface ParcelInfo {
+  parcelName: string;
+  houseNumber: string;
+  ownerName: string;
+}
+
 interface ConfirmDialogProps {
   open: boolean;
   type: AlarmType | null;
   onClose: () => void;
   initialLocation?: { lat: number; lng: number } | null;
+  parcels?: ParcelInfo[];
+  onParcelSelected?: (parcel: ParcelInfo) => void;
 }
 
-type DialogState = "confirm" | "sending" | "success" | "not_registered";
+type DialogState = "select_parcel" | "confirm" | "sending" | "success" | "not_registered";
 
-export default function ConfirmDialog({ open, type, onClose, initialLocation }: ConfirmDialogProps) {
+export default function ConfirmDialog({ open, type, onClose, initialLocation, parcels, onParcelSelected }: ConfirmDialogProps) {
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState(5);
   const [state, setState] = useState<DialogState>("confirm");
@@ -46,6 +54,12 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
       setAddress(null);
       setWhatsappWarning(null);
       return;
+    }
+
+    // If multiple parcels, show selection first
+    const hasMultiple = parcels && parcels.length > 1;
+    if (hasMultiple) {
+      setState("select_parcel");
     }
 
     const resolveAddress = async (lat: number, lng: number) => {
@@ -248,6 +262,21 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     onClose();
   };
 
+  const handleParcelSelect = (parcel: ParcelInfo) => {
+    // Update localStorage with the selected parcel
+    const settings = JSON.parse(localStorage.getItem("sosalerta_settings") || "{}");
+    const updated = {
+      ...settings,
+      parcelName: parcel.parcelName,
+      houseNumber: parcel.houseNumber,
+      senderName: parcel.ownerName,
+    };
+    localStorage.setItem("sosalerta_settings", JSON.stringify(updated));
+    onParcelSelected?.(parcel);
+    setState("confirm");
+    setCountdown(5);
+  };
+
   if (!type) return null;
 
   const cfg = alarmConfig[type];
@@ -256,7 +285,33 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation }: 
     <Dialog open={open} onOpenChange={(v) => { if (!v && state !== "sending") handleClose(); }}>
       <DialogContent className="sm:max-w-md border-border p-0 overflow-hidden [&>button.absolute]:hidden">
 
-        {state === "not_registered" ? (
+        {state === "select_parcel" ? (
+          /* ── Parcel Selection Screen ── */
+          <div className="flex flex-col items-center gap-4 p-8">
+            <div className={`w-16 h-16 rounded-full border-2 border-current flex items-center justify-center ${cfg.colorClass}`}>
+              <span className="text-3xl">{cfg.emoji}</span>
+            </div>
+            <h2 className="text-xl font-display font-bold">Alerta de {cfg.label}</h2>
+            <p className="text-sm text-muted-foreground text-center">
+              Seleccione la parcelación donde se encuentra:
+            </p>
+            <div className="flex flex-col gap-3 w-full">
+              {parcels?.map((p, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleParcelSelect(p)}
+                  className={`w-full px-4 py-4 rounded-xl border-2 border-border bg-background text-foreground font-display font-bold text-base hover:border-emergency-panic/60 hover:bg-emergency-panic/10 transition-all active:scale-95`}
+                >
+                  {p.parcelName}
+                </button>
+              ))}
+            </div>
+            <Button variant="outline" onClick={handleClose} className="w-full mt-2">
+              Cancelar
+            </Button>
+          </div>
+
+        ) : state === "not_registered" ? (
           /* ── Not Registered Screen ── */
           <div className="flex flex-col items-center gap-4 p-8">
             <div className="w-16 h-16 rounded-full border-2 border-emergency-panic/50 flex items-center justify-center">
