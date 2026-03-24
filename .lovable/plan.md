@@ -1,36 +1,65 @@
 
 
-## Plan: Dar permisos de administrador al rol `director_monitoreo`
+## Plan: Paso intermedio de selección de parcela antes de confirmar alarma
 
-### Cambios necesarios
+### Problema
+Cuando un usuario pertenece a múltiples parcelas, el sistema depende de localStorage para saber la parcela activa. Si por alguna razón el localStorage queda desactualizado o "enganchado" a una parcela equivocada, la alarma se envía a la parcela incorrecta.
 
-#### 1. Frontend — `src/pages/AdminPanel.tsx`
-- Cambiar las verificaciones `role !== "admin"` para aceptar también `director_monitoreo`
-- Línea 20: `if (!loading && (!user || (role !== "admin" && role !== "director_monitoreo")))`
-- Línea 33: misma condición
+### Solución
+Agregar un paso obligatorio de selección de parcela en el flujo de alarma. Cuando el usuario presiona cualquier botón de emergencia:
 
-#### 2. Frontend — `src/pages/Plataforma.tsx`
-- Agregar `director_monitoreo` a la condición que redirige a `/admin` (línea 17):
-  `if (role === "admin" || role === "director_monitoreo")`
+- **Si tiene 1 sola parcela**: ir directo al diálogo de confirmación actual (sin cambios)
+- **Si tiene 2+ parcelas**: mostrar primero un diálogo intermedio con el listado de parcelas para que elija explícitamente, y luego pasar al diálogo de confirmación
 
-#### 3. Edge Functions — Autorización del caller
-Los 3 edge functions verifican que el caller sea admin. Se debe ampliar para aceptar `director_monitoreo`:
+### Cambios
 
-- **`supabase/functions/create-user/index.ts`**: Cambiar query de roles para buscar `role IN ('admin', 'director_monitoreo')`
-- **`supabase/functions/update-user/index.ts`**: Igual
-- **`supabase/functions/delete-user/index.ts`**: Igual
+#### 1. `src/components/ConfirmDialog.tsx` — Agregar estado `select_parcel`
+- Nuevo estado en `DialogState`: `"select_parcel" | "confirm" | "sending" | "success" | "not_registered"`
+- Nuevas props: `parcels` (array de parcelas del usuario) y `onParcelSelected` (callback)
+- Cuando `open` se activa y hay múltiples parcelas → mostrar pantalla de selección con botones grandes por cada parcela
+- Al seleccionar una parcela: actualizar localStorage con esa parcela, luego pasar al estado `"confirm"` con el countdown normal
 
-#### 4. RLS Policies — Base de datos
-Las políticas de INSERT/UPDATE/DELETE en `gps_devices`, `user_roles`, `parcels` y `registered_numbers` solo permiten `admin`. Se deben agregar políticas adicionales (o modificar las existentes) para incluir `director_monitoreo`:
+#### 2. `src/pages/Index.tsx` — Pasar parcelas al diálogo
+- Eliminar los botones de cambio de parcela de la parte inferior (ya no son necesarios, la selección ocurre dentro del flujo de alarma)
+- Pasar `parcels` como prop al `ConfirmDialog`
+- Pasar callback `onParcelSelected` para actualizar el estado activo en Index
 
-- `gps_devices`: insert, update, delete
-- `parcels`: manage (ALL)
-- `user_roles`: insert, update, delete
-- `registered_numbers`: insert, update, delete
+#### 3. Pantalla de selección de parcela (dentro del diálogo)
+- Título: "Seleccione la parcelación"
+- Subtítulo: tipo de alarma seleccionada con emoji y color
+- Botones grandes (uno por parcela) con el nombre de la parcela
+- Sin countdown en este paso — espera la acción del usuario
 
-Se crearán nuevas políticas permisivas con `has_role(auth.uid(), 'director_monitoreo')` para cada tabla/operación afectada.
+### Flujo visual
+```text
+[Usuario presiona PÁNICO]
+         ↓
+┌──────────────────────────┐
+│  🔴 Alerta de PÁNICO     │
+│                          │
+│  Seleccione parcelación: │
+│                          │
+│  ┌────────────────────┐  │
+│  │   Teleguardia      │  │
+│  └────────────────────┘  │
+│  ┌────────────────────┐  │
+│  │   Loop             │  │
+│  └────────────────────┘  │
+│                          │
+│  [Cancelar]              │
+└──────────────────────────┘
+         ↓ (elige Teleguardia)
+┌──────────────────────────┐
+│  Confirmar Emergencia    │
+│  🔴 PÁNICO               │
+│  📍 ubicación...         │
+│  Countdown: 5...4...3... │
+│  [Cancelar] [CONFIRMAR]  │
+└──────────────────────────┘
+```
 
-### Sin cambios
-- No se modifica el esquema de tablas
-- El rol `director_monitoreo` ya existe en el enum `app_role`
+### Resultado
+- Se elimina la dependencia de localStorage para determinar la parcela — el usuario siempre confirma explícitamente
+- Si solo tiene una parcela, el flujo no cambia
+- Los botones de cambio de parcela en Index se eliminan (redundantes)
 
