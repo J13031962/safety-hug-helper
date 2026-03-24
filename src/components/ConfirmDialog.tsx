@@ -126,7 +126,10 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
         return;
       }
 
-      setState("confirm");
+      const hasMultiple = parcels && parcels.length > 1;
+      if (!hasMultiple) {
+        setState("confirm");
+      }
     };
 
     checkRegistration();
