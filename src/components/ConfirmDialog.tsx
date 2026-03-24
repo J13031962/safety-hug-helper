@@ -36,7 +36,7 @@ interface ConfirmDialogProps {
 
 type DialogState = "select_parcel" | "confirm" | "sending" | "success" | "not_registered";
 
-export default function ConfirmDialog({ open, type, onClose, initialLocation }: ConfirmDialogProps) {
+export default function ConfirmDialog({ open, type, onClose, initialLocation, parcels, onParcelSelected }: ConfirmDialogProps) {
   const navigate = useNavigate();
   const [countdown, setCountdown] = useState(5);
   const [state, setState] = useState<DialogState>("confirm");
