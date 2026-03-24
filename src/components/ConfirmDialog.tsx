@@ -19,14 +19,22 @@ const alarmConfig: Record<AlarmType, { label: string; emoji: string; colorClass:
   disaster: { label: "DESASTRE", emoji: "🟡", colorClass: "text-emergency-disaster", bgClass: "bg-emergency-disaster" },
 };
 
+interface ParcelInfo {
+  parcelName: string;
+  houseNumber: string;
+  ownerName: string;
+}
+
 interface ConfirmDialogProps {
   open: boolean;
   type: AlarmType | null;
   onClose: () => void;
   initialLocation?: { lat: number; lng: number } | null;
+  parcels?: ParcelInfo[];
+  onParcelSelected?: (parcel: ParcelInfo) => void;
 }
 
-type DialogState = "confirm" | "sending" | "success" | "not_registered";
+type DialogState = "select_parcel" | "confirm" | "sending" | "success" | "not_registered";
 
 export default function ConfirmDialog({ open, type, onClose, initialLocation }: ConfirmDialogProps) {
   const navigate = useNavigate();
