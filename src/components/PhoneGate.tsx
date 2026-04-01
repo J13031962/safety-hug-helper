@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Phone, AlertCircle } from "lucide-react";
-import smartSosLogo from "@/assets/smart_sos.png";
+import { Shield, Loader2, Phone, AlertCircle } from "lucide-react";
 
 interface RegisteredUser {
   owner_name: string;
@@ -136,7 +135,10 @@ export default function PhoneGate({ children }: PhoneGateProps) {
       <div className="w-full max-w-sm flex flex-col items-center gap-6">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
-          <img src={smartSosLogo} alt="SmartSOS" className="w-20 h-20 object-contain" />
+          <div className="w-20 h-20 rounded-full border-2 border-emergency-panic/40 flex items-center justify-center bg-emergency-panic/10">
+            <Shield className="w-10 h-10 text-emergency-panic" />
+          </div>
+          <h1 className="text-2xl font-display font-bold tracking-tight">SmartSOS</h1>
           <p className="text-sm text-muted-foreground text-center">
             Ingresa tu número de celular registrado para acceder
           </p>
