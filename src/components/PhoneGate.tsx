@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Shield, Loader2, Phone, AlertCircle } from "lucide-react";
+import { Loader2, Phone, AlertCircle } from "lucide-react";
+import smartSosLogo from "@/assets/smart_sos.png";
 
 interface RegisteredUser {
   owner_name: string;
