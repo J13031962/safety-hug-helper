@@ -1,30 +1,27 @@
 
 
-## Plan: Corregir que el selector de parcela se cierra solo
-
-### Problema
-En `ConfirmDialog.tsx`, cuando el diálogo abre con múltiples parcelas:
-1. Línea 62: `setState("select_parcel")` — correcto
-2. Línea 132: `checkRegistration()` se ejecuta en paralelo (async)
-3. Línea 129: cuando termina, hace `setState("confirm")` — **sobreescribe** el estado `select_parcel`
-
-Esto causa que el selector de parcela aparezca brevemente y luego sea reemplazado por la pantalla de confirmación con countdown.
+## Plan: Reemplazar ícono Shield por logo SmartSOS en PhoneGate
 
 ### Cambio
 
-**`src/components/ConfirmDialog.tsx`** — En `checkRegistration()`, cuando el usuario está registrado y tiene múltiples parcelas, NO cambiar el estado a `"confirm"`. Solo hacerlo si hay una sola parcela.
+**`src/components/PhoneGate.tsx`** — Reemplazar el ícono Shield (líneas 137-140) por la imagen del logo SmartSOS que ya se subió.
 
-Línea 129, cambiar:
-```typescript
-setState("confirm");
-```
-por:
-```typescript
-const hasMultiple = parcels && parcels.length > 1;
-if (!hasMultiple) {
-  setState("confirm");
-}
-```
+1. Copiar `user-uploads://smart_sos.png` → `src/assets/smart_sos.png`
+2. Importar la imagen en PhoneGate
+3. Reemplazar el div circular con Shield por un `<img>` con el logo, manteniendo `w-20 h-20` como dimensiones
+4. Eliminar el `<h1>SmartSOS</h1>` debajo ya que el logo ya contiene el texto
 
-Esto preserva el estado `"select_parcel"` cuando hay múltiples parcelas, y solo pasa a `"confirm"` cuando hay una sola.
+### Detalle técnico
+
+Líneas 137-141 cambian de:
+```tsx
+<div className="w-20 h-20 rounded-full border-2 ...">
+  <Shield className="w-10 h-10 text-emergency-panic" />
+</div>
+<h1 className="text-2xl ...">SmartSOS</h1>
+```
+a:
+```tsx
+<img src={smartSosLogo} alt="SmartSOS" className="w-20 h-20 object-contain" />
+```
 
