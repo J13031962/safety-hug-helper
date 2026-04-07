@@ -18,16 +18,17 @@ Custom GPS server configuration and API details
 - Preferred for relay: `{ deviceId, type: "engineStop" | "engineResume", attributes: {}, description: "..." }`
 - Fallback compatibility: `{ deviceId, type: "command", data: { command: "engineStop" | "engineResume" }, description: "..." }`
 
-## Siren Logic (IMPORTANT - INVERTED RELAY)
-- Alarm triggered → send engineResume via Traccar → relay opens → siren sounds
+## Siren Logic (IMPORTANT - INVERTED from Traccar perspective)
+- Alarm triggered → send engineStop via Traccar → relay activates → siren sounds
 - If alarm sent again while active → extend timer, show "siren already sounding"
-- After relay_duration seconds → send engineStop via Traccar → relay closes → siren stops
+- After relay_duration seconds → send engineResume via Traccar → relay deactivates → siren stops
 - Parcel matching is case-insensitive (trim + lowercase)
-- Commands are INVERTED: engineResume=ON, engineStop=OFF
+- Final resting state: engineResume (NO "fuel cut" in Traccar)
+- Commands mapping: engineStop=SIREN ON, engineResume=SIREN OFF
 
 ## Cron Worker
 - process-relay-jobs runs every ~20 seconds (3 pg_cron jobs with 0/20/40s offsets)
-- Checks relay_active_until to prevent premature engineStop from stale jobs
+- Checks relay_active_until to prevent premature engineResume from stale jobs
 
 ## Device
 - Model: VT08F
