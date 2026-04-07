@@ -336,7 +336,7 @@ Deno.serve(async (req) => {
           error_message: "Reemplazado por una alarma más reciente",
         })
         .eq("imei", device.imei)
-        .eq("action", "engineStop")
+        .eq("action", "engineResume")
         .in("status", ["pending", "processing"]);
 
       // Update relay_active_until BEFORE sending command
@@ -345,11 +345,11 @@ Deno.serve(async (req) => {
         .update({ relay_active_until: executeAt.toISOString() })
         .eq("imei", device.imei);
 
-      console.log(`[GPS] Sending engineResume (siren ON) -> IMEI=${device.imei}, duration=${duration}s`);
-      const resumeResult = await sendDeviceCommand(cookie, traccarDeviceId, "engineResume");
+      console.log(`[GPS] Sending engineStop (siren ON) -> IMEI=${device.imei}, duration=${duration}s`);
+      const stopResult = await sendDeviceCommand(cookie, traccarDeviceId, "engineStop");
 
-      if (!resumeResult.success) {
-        results.push({ imei: device.imei, success: false, error: resumeResult.error, attempts: resumeResult.attempts });
+      if (!stopResult.success) {
+        results.push({ imei: device.imei, success: false, error: stopResult.error, attempts: stopResult.attempts });
         continue;
       }
 
@@ -358,7 +358,7 @@ Deno.serve(async (req) => {
         .insert({
           imei: device.imei,
           device_id_traccar: traccarDeviceId,
-          action: "engineStop",
+          action: "engineResume",
           status: "pending",
           execute_at: executeAt.toISOString(),
           alarm_id: alarm_id || null,
@@ -368,7 +368,7 @@ Deno.serve(async (req) => {
         console.error(`[GPS] Failed creating relay job for ${device.imei}:`, jobError.message);
       }
 
-      console.log(`[GPS] ✓ engineResume sent (siren ON), engineStop scheduled at ${executeAt.toISOString()} (${duration}s)`);
+      console.log(`[GPS] ✓ engineStop sent (siren ON), engineResume scheduled at ${executeAt.toISOString()} (${duration}s)`);
 
       results.push({
         imei: device.imei,

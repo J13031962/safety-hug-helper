@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
       }
 
       // Before sending engineStop (siren OFF), check if a newer alarm extended the relay
-      if (job.action === "engineStop") {
+      if (job.action === "engineResume") {
         const { data: deviceRow } = await supabase
           .from("gps_devices")
           .select("relay_active_until")
@@ -215,7 +215,7 @@ Deno.serve(async (req) => {
           .from("gps_relay_jobs")
           .select("id")
           .eq("imei", job.imei)
-          .eq("action", "engineStop")
+          .eq("action", "engineResume")
           .in("status", ["pending", "processing"])
           .gt("execute_at", job.execute_at)
           .limit(1);
