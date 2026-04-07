@@ -6,6 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- TODO: Set the document title to the name of your application -->
     <title>SmartSOS</title>
+    <script>
+      try {
+        var s = JSON.parse(localStorage.getItem('sosalerta_settings') || '{}');
+        if (s.darkMode === false) document.documentElement.classList.add('light');
+      } catch(e) {}
+    </script>
     <meta name="description" content="SmartSOS - Sistema de emergencias inteligente">
     <meta name="author" content="Lovable" />
 
