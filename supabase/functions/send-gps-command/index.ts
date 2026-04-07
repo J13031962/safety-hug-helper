@@ -375,7 +375,7 @@ Deno.serve(async (req) => {
         success: true,
         relay_duration: duration,
         stop_at: executeAt.toISOString(),
-        attempts: resumeResult.attempts,
+        attempts: stopResult.attempts,
       });
     }
 
