@@ -1,59 +1,37 @@
 
 
-## Plan: Integración SIA-DCS con CRA
+## Plan: Corregir formato del mensaje SIA-DCS para que llegue a la CRA
 
-### Resumen
-Agregar campos de número de abonado (parcelas) y número de usuario/zona (números registrados) para enviar eventos SIA-DCS por TCP a la CRA cuando se dispara una alarma.
+### Problema
+Los logs muestran que el mensaje se envía sin error TCP, pero no llega a la CRA. La diferencia con los comandos PowerShell que sí funcionan es:
 
-### Formato SIA-DCS
-```text
-"SIA-DCS"0001L0#ACCOUNT[#ACCOUNT|XXZONE]_
-```
-- `ACCOUNT` = número de abonado de la parcela
-- `XX` = código de evento (PA=pánico, FA=incendio, MA=médica, BA=desastre)
-- `ZONE` = número de usuario (zona, 3 dígitos)
+1. **Salto de línea**: PowerShell `WriteLine` envía `\r\n` (CRLF). Nuestro código envía solo `\n` (LF). Muchos receptores SIA esperan CRLF.
+2. **Cierre de conexión**: `conn.close()` se llama inmediatamente sin esperar que los datos se vacíen del buffer.
 
-### Cambios
+### Cambio
 
-#### 1. Migración de base de datos
-- Agregar columna `account_number` (text, nullable) a tabla `parcels`
-- Agregar columna `user_number` (text, nullable) a tabla `registered_numbers`
-- Insertar `account_number = '9999'` en parcela "Teleguardia" como datos de prueba
-
-#### 2. Nueva Edge Function: `send-sia-event`
-- Recibe: `alarm_type`, `parcel_name`, `phone_number`
-- Busca el `account_number` de la parcela
-- Busca el `user_number` del registered_number (matching phone + parcel)
-- Mapea alarm_type → código SIA: panic→PA, fire→FA, medical→MA, disaster→BA
-- Abre conexión TCP a `51.79.66.148:9558`
-- Envía el mensaje SIA-DCS formateado
-- Usa `Deno.connect()` para TCP nativo en Edge Functions
-
-#### 3. Modificar `ConfirmDialog.tsx`
-- Después de enviar WhatsApp y GPS, invocar `send-sia-event` con los datos de la alarma
-- Manejar errores/warnings igual que GPS
-
-#### 4. UI Admin — `ParcelsTab.tsx`
-- Agregar campo "Número de abonado (CRA)" al formulario de crear/editar parcela
-
-#### 5. UI Admin — `RegisteredNumbersTab.tsx`
-- Agregar campo "Número de usuario (zona CRA)" al formulario de crear/editar número
-- Como cada registro ya es por combinación phone+parcel, cada uno tendrá su propio user_number
-
-#### 6. Actualizar documentación
-- `.lovable/memory/features/gps-server.md` o nuevo archivo de memoria con la lógica SIA-DCS
-
-### Detalle técnico: Edge Function TCP
+**`supabase/functions/send-sia-event/index.ts`** — Líneas 91 y 96-100:
 
 ```typescript
-// Conexión TCP con Deno
-const conn = await Deno.connect({ hostname: "51.79.66.148", port: 9558 });
+// Cambiar \n por \r\n (CRLF como PowerShell WriteLine)
+const message = `"SIA-DCS"0001L0#${accountNumber}[#${accountNumber}|${eventCode}${zone}]_\r\n`;
+
+// Usar closeWrite() para señalar fin de escritura y dar tiempo al flush
+const conn = await Deno.connect({ hostname: SIA_HOST, port: SIA_PORT });
 const encoder = new TextEncoder();
-const message = `"SIA-DCS"0001L0#${account}[#${account}|${eventCode}${zone}]_\n`;
 await conn.write(encoder.encode(message));
+
+// Leer respuesta del servidor (si la hay) antes de cerrar
+const buf = new Uint8Array(256);
+try {
+  await conn.read(buf);
+} catch (_) {
+  // Servidor puede no responder, está bien
+}
 conn.close();
 ```
 
-### Datos de prueba
-- Parcela "Teleguardia" → account_number: `9999`
+### Detalle
+- Se cambia `\n` → `\r\n` para que coincida exactamente con lo que envía PowerShell
+- Se intenta leer una respuesta del servidor antes de cerrar, lo que garantiza que los datos se enviaron completamente antes del cierre de la conexión
 
