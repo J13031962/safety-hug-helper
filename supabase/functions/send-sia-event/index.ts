@@ -88,7 +88,7 @@ Deno.serve(async (req) => {
     }
 
     // Build SIA-DCS message
-    const message = `"SIA-DCS"0001L0#${accountNumber}[#${accountNumber}|${eventCode}${zone}]_\n`;
+    const message = `"SIA-DCS"0001L0#${accountNumber}[#${accountNumber}|${eventCode}${zone}]_\r\n`;
     console.log("[SIA] Sending:", message.trim(), "to", SIA_HOST, SIA_PORT);
 
     // Send via TCP
@@ -96,6 +96,14 @@ Deno.serve(async (req) => {
       const conn = await Deno.connect({ hostname: SIA_HOST, port: SIA_PORT });
       const encoder = new TextEncoder();
       await conn.write(encoder.encode(message));
+
+      // Read response to ensure data is flushed before closing
+      const buf = new Uint8Array(256);
+      try {
+        await conn.read(buf);
+      } catch (_) {
+        // Server may not respond, that's ok
+      }
       conn.close();
       console.log("[SIA] Message sent successfully");
     } catch (tcpErr: any) {
