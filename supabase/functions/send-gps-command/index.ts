@@ -193,10 +193,11 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { alarm_type, imei, action, alarm_id } = body;
+    const { alarm_type, imei, action, alarm_id, mode } = body;
 
     const cookie = await traccarLogin();
 
+    // Direct command mode (action + imei) or test mode
     if (action && imei) {
       const deviceId = await findDeviceId(cookie, imei);
       if (!deviceId) {
@@ -207,6 +208,32 @@ Deno.serve(async (req) => {
       }
 
       const result = await sendDeviceCommand(cookie, deviceId, action as DeviceAction);
+
+      // In test mode, also schedule auto-off
+      if (mode === "test" && action === "engineStop" && result.success) {
+        const supabase = getSupabase();
+        const { data: device } = await supabase
+          .from("gps_devices")
+          .select("relay_duration")
+          .eq("imei", imei)
+          .maybeSingle();
+        
+        const duration = device?.relay_duration ?? 30;
+        const executeAt = new Date(Date.now() + duration * 1000);
+
+        await supabase.from("gps_devices")
+          .update({ relay_active_until: executeAt.toISOString() })
+          .eq("imei", imei);
+
+        await supabase.from("gps_relay_jobs").insert({
+          imei,
+          device_id_traccar: deviceId,
+          action: "engineResume",
+          status: "pending",
+          execute_at: executeAt.toISOString(),
+        });
+      }
+
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -242,7 +269,6 @@ Deno.serve(async (req) => {
         .select("phone_number, parcel_name");
 
       if (regNumbers) {
-        // If clientParcel is set, validate the phone is registered in that specific parcel
         if (clientParcel) {
           const matchInParcel = regNumbers.find((r: any) => {
             const regDigits = normalizePhone(r.phone_number);
@@ -253,25 +279,17 @@ Deno.serve(async (req) => {
             console.log(`[GPS] Phone ${senderPhone} verified in parcel "${clientParcel}"`);
           } else {
             console.log(`[GPS] Phone ${senderPhone} NOT registered in parcel "${clientParcel}" — checking any parcel`);
-            const anyMatch = regNumbers.find((r: any) => phonesMatch(normalizePhone(r.phone_number), senderPhone));
-            if (!anyMatch) {
-              console.log(`[GPS] Phone ${senderPhone} not found in registered_numbers at all`);
-            }
           }
         } else {
-          // No clientParcel — fallback to first match
           const match = regNumbers.find((r: any) => phonesMatch(normalizePhone(r.phone_number), senderPhone));
           if (match) {
             resolvedParcel = normalizeParcel(match.parcel_name || "");
             console.log(`[GPS] Phone ${senderPhone} -> parcel "${match.parcel_name}" (fallback)`);
-          } else {
-            console.log(`[GPS] Phone ${senderPhone} not found in registered_numbers`);
           }
         }
       }
     }
 
-    // PRIORITY: client-selected parcel first, DB lookup as fallback
     const finalParcel = clientParcel || resolvedParcel;
 
     if (!finalParcel) {
@@ -285,25 +303,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: allDevices, error: dbError } = await supabase
-      .from("gps_devices")
-      .select("imei, relay_duration, relay_active_until, parcel_name");
+    // Query devices via gps_device_parcels (many-to-many)
+    const { data: deviceParcels, error: dpError } = await supabase
+      .from("gps_device_parcels")
+      .select("device_id")
+      .ilike("parcel_name", finalParcel);
 
-    if (dbError) {
-      console.error("[GPS] DB error:", dbError);
-      return new Response(JSON.stringify({ success: false, reason: "db_error", error: dbError.message }), {
+    if (dpError) {
+      console.error("[GPS] DB error:", dpError);
+      return new Response(JSON.stringify({ success: false, reason: "db_error", error: dpError.message }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const targetDevices = (allDevices || []).filter((d: any) =>
-      normalizeParcel(d.parcel_name || "") === finalParcel,
-    );
+    const deviceIds = [...new Set((deviceParcels || []).map((dp: any) => dp.device_id))];
 
-    console.log(`[GPS] Parcel: "${finalParcel}" | Total devices: ${allDevices?.length || 0} | Matched: ${targetDevices.length}`);
-
-    if (targetDevices.length === 0) {
+    if (deviceIds.length === 0) {
       return new Response(JSON.stringify({
         success: false,
         reason: "no_devices_for_parcel",
@@ -313,6 +329,15 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const { data: allDevices } = await supabase
+      .from("gps_devices")
+      .select("id, imei, relay_duration, relay_active_until")
+      .in("id", deviceIds);
+
+    const targetDevices = allDevices || [];
+
+    console.log(`[GPS] Parcel: "${finalParcel}" | Matched devices: ${targetDevices.length}`);
 
     const now = new Date();
     const results: any[] = [];
@@ -327,7 +352,6 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Cancel old jobs FIRST to prevent race condition with cron worker
       await supabase
         .from("gps_relay_jobs")
         .update({
@@ -339,7 +363,6 @@ Deno.serve(async (req) => {
         .eq("action", "engineResume")
         .in("status", ["pending", "processing"]);
 
-      // Update relay_active_until BEFORE sending command
       await supabase
         .from("gps_devices")
         .update({ relay_active_until: executeAt.toISOString() })
@@ -367,8 +390,6 @@ Deno.serve(async (req) => {
       if (jobError) {
         console.error(`[GPS] Failed creating relay job for ${device.imei}:`, jobError.message);
       }
-
-      console.log(`[GPS] ✓ engineStop sent (siren ON), engineResume scheduled at ${executeAt.toISOString()} (${duration}s)`);
 
       results.push({
         imei: device.imei,

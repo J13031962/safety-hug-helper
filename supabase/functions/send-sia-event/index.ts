@@ -14,6 +14,7 @@ const EVENT_CODES: Record<string, string> = {
   fire: "FA",
   medical: "MA",
   disaster: "BA",
+  test: "OP",
 };
 
 Deno.serve(async (req) => {
@@ -87,8 +88,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Build SIA-DCS message
-    const message = `"SIA-DCS"0001L0#${accountNumber}[#${accountNumber}|${eventCode}${zone}]_\r\n`;
+    // For test events (OP), zone is not needed — send without zone suffix
+    const zoneStr = alarm_type === "test" ? "" : zone;
+    const message = `"SIA-DCS"0001L0#${accountNumber}[#${accountNumber}|${eventCode}${zoneStr}]_\r\n`;
     console.log("[SIA] Sending:", message.trim(), "to", SIA_HOST, SIA_PORT);
 
     // Send via TCP
@@ -115,7 +117,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, account: accountNumber, zone, event_code: eventCode, message: message.trim() }),
+      JSON.stringify({ success: true, account: accountNumber, zone: zoneStr, event_code: eventCode, message: message.trim() }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
