@@ -1,0 +1,1 @@
+DROP POLICY "Public can insert device parcels" ON public.gps_device_parcels;
