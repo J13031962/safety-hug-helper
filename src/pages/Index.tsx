@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { Activity, MapPin, LogOut } from "lucide-react";
+import { Activity, MapPin, LogOut, Radio } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import EmergencyGrid from "@/components/EmergencyGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import TestSirenDialog from "@/components/TestSirenDialog";
 import PhoneGate from "@/components/PhoneGate";
 import smartsosLogo from "@/assets/smartsos-logo.png";
 
@@ -19,6 +20,7 @@ const ADMIN_PHONE = "3332840057";
 const IndexContent = () => {
   const [selectedType, setSelectedType] = useState<AlarmType | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
   const [gpsActive, setGpsActive] = useState(false);
   const locationRef = useRef<{ lat: number; lng: number } | null>(null);
   const navigate = useNavigate();
@@ -37,9 +39,9 @@ const IndexContent = () => {
   const userName = activeParcel?.ownerName || settings.senderName || "";
   const phoneDigits = (settings.phoneNumber || "").replace(/\D/g, "");
   const isAdmin = phoneDigits.endsWith(ADMIN_PHONE);
+  const isParcelAdmin = !!settings.isParcelAdmin;
   const hasMultipleParcels = parcels.length > 1;
 
-  // Update localStorage when switching parcels
   const switchParcel = (index: number) => {
     setActiveParcelIndex(index);
     const p = parcels[index];
@@ -52,7 +54,6 @@ const IndexContent = () => {
     localStorage.setItem("sosalerta_settings", JSON.stringify(updated));
   };
 
-  // Continuously track GPS position
   useEffect(() => {
     if (!navigator.geolocation) return;
 
@@ -91,6 +92,8 @@ const IndexContent = () => {
     localStorage.removeItem("sosalerta_settings");
     window.location.reload();
   };
+
+  const userParcelNames = parcels.map((p) => p.parcelName).filter(Boolean);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -135,6 +138,16 @@ const IndexContent = () => {
         <p className="text-muted-foreground text-sm">Presiona un botón para enviar alerta de emergencia</p>
         <EmergencyGrid onSelect={handleSelect} />
 
+        {isParcelAdmin && (
+          <button
+            onClick={() => setTestDialogOpen(true)}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-muted border border-border text-muted-foreground hover:text-foreground hover:bg-accent transition-all font-display font-bold text-sm"
+          >
+            <Radio className="w-5 h-5" />
+            PRUEBA DE SIRENAS
+          </button>
+        )}
+
         <p className="text-xs text-muted-foreground mt-4">Las alertas se envían vía WhatsApp y activan las sirenas</p>
       </main>
 
@@ -148,6 +161,12 @@ const IndexContent = () => {
           const idx = parcels.findIndex(p => p.parcelName === parcel.parcelName);
           if (idx >= 0) setActiveParcelIndex(idx);
         }}
+      />
+
+      <TestSirenDialog
+        open={testDialogOpen}
+        onClose={() => setTestDialogOpen(false)}
+        userParcels={userParcelNames}
       />
     </div>
   );

@@ -36,7 +36,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
           const digits = settings.phoneNumber.replace(/\D/g, "");
           supabase
             .from("registered_numbers")
-            .select("phone_number, owner_name, house_number, parcel_name")
+            .select("phone_number, owner_name, house_number, parcel_name, is_parcel_admin")
             .then(({ data }) => {
               const matches = data?.filter((r) => {
                 const rd = r.phone_number.replace(/\D/g, "");
