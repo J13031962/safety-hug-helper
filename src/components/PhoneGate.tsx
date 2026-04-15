@@ -78,7 +78,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
     try {
       const { data: allNumbers } = await supabase
         .from("registered_numbers")
-        .select("phone_number, owner_name, house_number, parcel_name");
+        .select("phone_number, owner_name, house_number, parcel_name, is_parcel_admin");
 
     const matches = allNumbers?.filter((r) => {
         const rd = normalizeDigits(r.phone_number);
@@ -99,6 +99,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
       }));
 
       const first = parcels[0];
+      const isParcelAdmin = matches.some((m) => !!(m as any).is_parcel_admin);
 
       // Save to localStorage so ConfirmDialog and the app can use it
       const settings = {
@@ -108,6 +109,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
         parcelName: first.parcelName,
         phoneVerified: true,
         parcels,
+        isParcelAdmin: isParcelAdmin,
       };
       localStorage.setItem("sosalerta_settings", JSON.stringify(settings));
       setVerified(true);
