@@ -253,6 +253,37 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
       });
     }
 
+    // Try SIA-DCS event to CRA
+    let siaWarning: string | null = null;
+    try {
+      const { data: siaData, error: siaErr } = await supabase.functions.invoke("send-sia-event", {
+        body: {
+          alarm_type: type,
+          parcel_name: alarmData.parcel_name,
+          phone_number: alarmData.phone_number,
+        },
+      });
+      if (siaErr) {
+        console.warn("[SIA] Error:", siaErr);
+        siaWarning = "No se pudo enviar evento a la CRA.";
+      } else if (siaData?.success === false) {
+        console.warn("[SIA]", siaData.reason, siaData.message);
+        if (siaData.reason !== "no_account") {
+          siaWarning = siaData.message || "No se pudo enviar evento a la CRA.";
+        }
+      }
+    } catch (siaEx) {
+      console.warn("[SIA] Error:", siaEx);
+      siaWarning = "No se pudo enviar evento a la CRA.";
+    }
+
+    if (siaWarning) {
+      setWhatsappWarning((prev) => {
+        const parts = [prev, `🏢 ${siaWarning}`].filter(Boolean);
+        return parts.join("\n");
+      });
+    }
+
     setState("success");
 
     // Auto-close after 4 seconds

@@ -14,6 +14,7 @@ interface Parcel {
   name: string;
   whatsapp_group_id: string | null;
   whatsapp_invite_link: string | null;
+  account_number: string | null;
   created_at: string;
 }
 
@@ -22,7 +23,7 @@ export default function ParcelsTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Parcel | null>(null);
-  const [form, setForm] = useState({ name: "", whatsapp_group_id: "", whatsapp_invite_link: "" });
+  const [form, setForm] = useState({ name: "", whatsapp_group_id: "", whatsapp_invite_link: "", account_number: "" });
   const [submitting, setSubmitting] = useState(false);
 
   // Resolve group ID dialog
@@ -42,13 +43,13 @@ export default function ParcelsTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: "", whatsapp_group_id: "", whatsapp_invite_link: "" });
+    setForm({ name: "", whatsapp_group_id: "", whatsapp_invite_link: "", account_number: "" });
     setDialogOpen(true);
   };
 
   const openEdit = (p: Parcel) => {
     setEditing(p);
-    setForm({ name: p.name, whatsapp_group_id: p.whatsapp_group_id || "", whatsapp_invite_link: p.whatsapp_invite_link || "" });
+    setForm({ name: p.name, whatsapp_group_id: p.whatsapp_group_id || "", whatsapp_invite_link: p.whatsapp_invite_link || "", account_number: p.account_number || "" });
     setDialogOpen(true);
   };
 
@@ -62,6 +63,7 @@ export default function ParcelsTab() {
       name: form.name.trim(),
       whatsapp_group_id: form.whatsapp_group_id.trim() || null,
       whatsapp_invite_link: form.whatsapp_invite_link.trim() || null,
+      account_number: form.account_number.trim() || null,
     };
 
     if (editing) {
@@ -152,6 +154,7 @@ export default function ParcelsTab() {
             <TableHeader>
               <TableRow>
                 <TableHead>Parcela</TableHead>
+                <TableHead>Nº Abonado CRA</TableHead>
                 <TableHead>Grupo WhatsApp ID</TableHead>
                 <TableHead>Enlace de invitación</TableHead>
                 <TableHead className="w-32">Acciones</TableHead>
@@ -161,6 +164,13 @@ export default function ParcelsTab() {
               {parcels.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell>
+                    {p.account_number ? (
+                      <span className="text-xs font-mono text-primary">{p.account_number}</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic">Sin asignar</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {p.whatsapp_group_id ? (
                       <span className="text-xs font-mono text-primary">{p.whatsapp_group_id}</span>
@@ -191,7 +201,7 @@ export default function ParcelsTab() {
                 </TableRow>
               ))}
               {parcels.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No hay parcelas</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No hay parcelas</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -206,6 +216,11 @@ export default function ParcelsTab() {
             <div className="space-y-2">
               <Label>Nombre de la parcela</Label>
               <Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Hacienda San Sebastian" />
+            </div>
+            <div className="space-y-2">
+              <Label>Número de abonado CRA (opcional)</Label>
+              <Input value={form.account_number} onChange={(e) => setForm(f => ({ ...f, account_number: e.target.value }))} placeholder="Ej: 9999" className="font-mono text-sm" />
+              <p className="text-xs text-muted-foreground">Número de cuenta del abonado en la Central Receptora de Alarmas.</p>
             </div>
             <div className="space-y-2">
               <Label>Group ID de WhatsApp (opcional)</Label>

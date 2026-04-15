@@ -35,7 +35,7 @@ export default function RegisteredNumbersTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState<string | null>(null);
-  const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_names: [] as string[] });
+  const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_names: [] as string[], user_numbers: {} as Record<string, string> });
   const [submitting, setSubmitting] = useState(false);
 
   // Rename parcel dialog
@@ -89,17 +89,24 @@ export default function RegisteredNumbersTab() {
 
   const openCreate = () => {
     setEditingPhone(null);
-    setForm({ owner_name: "", phone_number: "", house_number: "", parcel_names: [] });
+    setForm({ owner_name: "", phone_number: "", house_number: "", parcel_names: [], user_numbers: {} });
     setDialogOpen(true);
   };
 
   const openEdit = (g: GroupedNumber) => {
     setEditingPhone(g.phone_number.replace(/\D/g, ""));
+    const userNums: Record<string, string> = {};
+    for (const r of g.rows) {
+      if (r.parcel_name && (r as any).user_number) {
+        userNums[r.parcel_name] = (r as any).user_number;
+      }
+    }
     setForm({
       owner_name: g.owner_name,
       phone_number: g.phone_number,
       house_number: g.house_number || "",
       parcel_names: [...g.parcels],
+      user_numbers: userNums,
     });
     setDialogOpen(true);
   };
@@ -141,6 +148,7 @@ export default function RegisteredNumbersTab() {
         phone_number: form.phone_number,
         house_number: form.house_number || null,
         parcel_name,
+        user_number: form.user_numbers[parcel_name]?.trim() || null,
       }));
 
       const { error } = await supabase.from("registered_numbers").insert(rows);
@@ -255,22 +263,34 @@ export default function RegisteredNumbersTab() {
             <div className="space-y-2"><Label>Teléfono WhatsApp</Label><Input value={form.phone_number} onChange={(e) => setForm((f) => ({ ...f, phone_number: e.target.value }))} placeholder="+58 412 1234567" /></div>
             <div className="space-y-2"><Label>Número de casa</Label><Input value={form.house_number} onChange={(e) => setForm((f) => ({ ...f, house_number: e.target.value }))} placeholder="Ej: A-12" /></div>
             
-            {/* Multi-select parcels with checkboxes */}
+            {/* Multi-select parcels with checkboxes and user_number */}
             <div className="space-y-2">
               <Label>Parcelaciones</Label>
               {uniqueParcels.length > 0 ? (
                 <div className="max-h-48 overflow-y-auto rounded-md border border-border p-2 space-y-1">
                   {uniqueParcels.map((p) => (
-                    <label key={p} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer transition-colors">
-                      <Checkbox
-                        checked={form.parcel_names.includes(p)}
-                        onCheckedChange={() => toggleParcel(p)}
-                      />
-                      <span className="text-sm">{p}</span>
-                      {parcels.find((px) => px.name === p)?.whatsapp_group_id && (
-                        <span className="text-xs text-muted-foreground ml-auto">✅ Grupo WA</span>
+                    <div key={p} className="space-y-1">
+                      <label className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer transition-colors">
+                        <Checkbox
+                          checked={form.parcel_names.includes(p)}
+                          onCheckedChange={() => toggleParcel(p)}
+                        />
+                        <span className="text-sm">{p}</span>
+                        {parcels.find((px) => px.name === p)?.whatsapp_group_id && (
+                          <span className="text-xs text-muted-foreground ml-auto">✅ Grupo WA</span>
+                        )}
+                      </label>
+                      {form.parcel_names.includes(p) && (
+                        <div className="ml-8 mb-1">
+                          <Input
+                            value={form.user_numbers[p] || ""}
+                            onChange={(e) => setForm(f => ({ ...f, user_numbers: { ...f.user_numbers, [p]: e.target.value } }))}
+                            placeholder="Nº usuario/zona CRA (ej: 001)"
+                            className="h-8 text-xs font-mono"
+                          />
+                        </div>
                       )}
-                    </label>
+                    </div>
                   ))}
                 </div>
               ) : (
