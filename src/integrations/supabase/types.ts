@@ -142,6 +142,7 @@ export type Database = {
       }
       parcels: {
         Row: {
+          account_number: string | null
           created_at: string
           id: string
           name: string
@@ -149,6 +150,7 @@ export type Database = {
           whatsapp_invite_link: string | null
         }
         Insert: {
+          account_number?: string | null
           created_at?: string
           id?: string
           name: string
@@ -156,6 +158,7 @@ export type Database = {
           whatsapp_invite_link?: string | null
         }
         Update: {
+          account_number?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -197,6 +200,7 @@ export type Database = {
           owner_name: string
           parcel_name: string | null
           phone_number: string
+          user_number: string | null
         }
         Insert: {
           callmebot_apikey?: string | null
@@ -206,6 +210,7 @@ export type Database = {
           owner_name: string
           parcel_name?: string | null
           phone_number: string
+          user_number?: string | null
         }
         Update: {
           callmebot_apikey?: string | null
@@ -215,6 +220,7 @@ export type Database = {
           owner_name?: string
           parcel_name?: string | null
           phone_number?: string
+          user_number?: string | null
         }
         Relationships: []
       }
