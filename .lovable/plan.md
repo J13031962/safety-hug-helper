@@ -1,52 +1,38 @@
 
 
-## Plan: Corregir visibilidad de sirenas + reportes de prueba + renombrar GPS
+## Plan: Enviar mensaje WhatsApp en pruebas de sirena
 
-### Problemas identificados
-
-1. **Sirenas no aparecen en móvil/incógnito**: La tabla `gps_devices` tiene RLS que requiere `authenticated`, pero los usuarios del PhoneGate NO están autenticados con Supabase (solo usan localStorage). La tabla `gps_device_parcels` sí tiene política `public SELECT`, pero `gps_devices` no — por eso la segunda query falla silenciosamente y devuelve vacío.
-
-2. **Eventos de prueba no aparecen** en `/operador` ni en la sección Alarmas de `/admin`.
-
-3. **No se puede renombrar/identificar los GPS** — no hay campo `name` editable.
-
----
+### Resumen
+Cuando un admin de parcelación activa una prueba de sirena, enviar un mensaje WhatsApp al grupo de la parcela usando el mismo formato actual pero indicando que es una prueba e incluyendo el nombre de la sirena disparada.
 
 ### Cambios
 
-#### 1. Migración de base de datos
-- Agregar política RLS `SELECT` pública a `gps_devices` (igual que `gps_device_parcels`) para que usuarios no autenticados puedan consultar dispositivos.
-- Agregar columna `name` (text, nullable) a `gps_devices` para poder renombrar las sirenas.
+#### 1. `send-whatsapp/index.ts` — Soporte para tipo "test"
+- Agregar `test` al mapa `ALARM_LABELS`: `test: "🔔 PRUEBA DE SIRENA"`
+- Leer un nuevo campo opcional `siren_name` del body
+- Si `siren_name` está presente, agregarlo al mensaje: `📡 Sirena: {siren_name}`
 
-#### 2. `TestSirenDialog.tsx` — Registrar evento de prueba en `alarms`
-- Después de activar una sirena, insertar un registro en la tabla `alarms` con:
+#### 2. `TestSirenDialog.tsx` — Invocar send-whatsapp tras activar
+- Después de activar la sirena y enviar el evento SIA, llamar `send-whatsapp` para cada parcela de la sirena con:
   - `alarm_type: "test"`
-  - `sender_name`: nombre del usuario (de localStorage)
-  - `parcel_name`: parcela(s) de la sirena
-  - `status: "resolved"` (es prueba, no requiere atención)
-  - Agregar campo extra con el nombre/IMEI de la sirena en `observations`
+  - `sender_name`: nombre del usuario
+  - `parcel_name`: parcela
+  - `siren_name`: nombre/modelo/IMEI de la sirena activada
 
-#### 3. `AlarmsHistoryTab.tsx` — Mostrar eventos de prueba
-- Agregar `test` al mapa `typeLabels` con label "Prueba" y color gris/neutro.
+### Formato del mensaje WhatsApp
+```
+*SmartSOS informa:*
 
-#### 4. `OperatorDashboard.tsx` — Mostrar eventos de prueba
-- Agregar `test` al mapa `typeConfig` para que aparezcan en el dashboard del operador.
+🔔 PRUEBA DE SIRENA
 
-#### 5. `GpsDevicesTab.tsx` — Campo de nombre
-- Agregar campo "Nombre" al formulario de crear/editar GPS.
-- Mostrar el nombre en la tabla de dispositivos.
-- Guardar en la columna `name` de `gps_devices`.
+👤 Juan Pérez
+📡 Sirena: Entrada Principal
+📍 Parcela: Teleguardia
 
-#### 6. `TestSirenDialog.tsx` — Mostrar nombre del GPS
-- En vez de "Sirena 1", "Sirena 2", mostrar `device.name || device.model || device.imei`.
-
-#### 7. `send-sia-event/index.ts`
-- Agregar `test` → `OP` al mapa de eventos (ya existe, sin cambios necesarios).
+🌐 www.teleguardia.com
+```
 
 ### Archivos a modificar
-- **Migración SQL**: política pública SELECT en `gps_devices` + columna `name`
-- **`GpsDevicesTab.tsx`**: campo nombre
-- **`TestSirenDialog.tsx`**: insertar alarm de prueba + mostrar nombre
-- **`AlarmsHistoryTab.tsx`**: tipo "test"
-- **`OperatorDashboard.tsx`**: tipo "test"
+- `supabase/functions/send-whatsapp/index.ts` — agregar label "test" y campo `siren_name`
+- `src/components/TestSirenDialog.tsx` — invocar `send-whatsapp` en `handleActivate`
 
