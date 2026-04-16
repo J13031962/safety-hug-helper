@@ -22,6 +22,7 @@ const typeConfig: Record<string, { label: string; emoji: string; color: string; 
   medical: { label: "MÉDICA", emoji: "🏥", color: "bg-emergency-medical", border: "border-emergency-medical/40" },
   fire: { label: "INCENDIO", emoji: "🔥", color: "bg-emergency-fire", border: "border-emergency-fire/40" },
   disaster: { label: "DESASTRE", emoji: "⚠️", color: "bg-emergency-disaster", border: "border-emergency-disaster/40" },
+  test: { label: "PRUEBA", emoji: "🔔", color: "bg-muted", border: "border-muted-foreground/40" },
 };
 
 export default function OperatorDashboard() {
