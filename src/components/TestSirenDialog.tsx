@@ -9,6 +9,7 @@ interface SirenDevice {
   id: string;
   imei: string;
   model: string | null;
+  name: string | null;
   relay_duration: number;
   parcel_names: string[];
 }
@@ -17,9 +18,10 @@ interface TestSirenDialogProps {
   open: boolean;
   onClose: () => void;
   userParcels: string[];
+  userName?: string;
 }
 
-export default function TestSirenDialog({ open, onClose, userParcels }: TestSirenDialogProps) {
+export default function TestSirenDialog({ open, onClose, userParcels, userName }: TestSirenDialogProps) {
   const [sirens, setSirens] = useState<SirenDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export default function TestSirenDialog({ open, onClose, userParcels }: TestSire
     const deviceIds = [...new Set(dpData.map((dp) => dp.device_id))];
     const { data: devices } = await supabase
       .from("gps_devices")
-      .select("id, imei, model, relay_duration")
+      .select("id, imei, model, relay_duration, name")
       .in("id", deviceIds);
 
     const mapped: SirenDevice[] = (devices || []).map((d) => ({
@@ -81,8 +83,20 @@ export default function TestSirenDialog({ open, onClose, userParcels }: TestSire
         });
       }
 
+      // Register test alarm for each parcel
+      for (const parcel of siren.parcel_names) {
+        await supabase.from("alarms").insert({
+          alarm_type: "test",
+          sender_name: userName || "Admin",
+          parcel_name: parcel,
+          status: "resolved",
+          observations: `Prueba de sirena: ${siren.name || siren.model || siren.imei}`,
+        });
+      }
+
       setResults((r) => ({ ...r, [siren.id]: "success" }));
-      toast({ title: "Sirena activada", description: `${siren.model || siren.imei} — se apagará en ${siren.relay_duration}s` });
+      const displayName = siren.name || siren.model || siren.imei;
+      toast({ title: "Sirena activada", description: `${displayName} — se apagará en ${siren.relay_duration}s` });
     } catch {
       setResults((r) => ({ ...r, [siren.id]: "error" }));
       toast({ title: "Error", description: "No se pudo activar la sirena", variant: "destructive" });
@@ -114,7 +128,7 @@ export default function TestSirenDialog({ open, onClose, userParcels }: TestSire
             {sirens.map((s, i) => (
               <div key={s.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                 <div>
-                  <p className="text-sm font-medium">Sirena {i + 1} {s.model ? `(${s.model})` : ""}</p>
+                  <p className="text-sm font-medium">{s.name || `Sirena ${i + 1}`} {s.model ? `(${s.model})` : ""}</p>
                   <p className="text-xs text-muted-foreground font-mono">{s.imei}</p>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {s.parcel_names.map((p) => (

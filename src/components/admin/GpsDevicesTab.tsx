@@ -23,7 +23,7 @@ export default function GpsDevicesTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DeviceWithParcels | null>(null);
-  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_names: [] as string[] });
+  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [] as string[] });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchDevices = async () => {
@@ -51,13 +51,13 @@ export default function GpsDevicesTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_names: [] });
+    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [] });
     setDialogOpen(true);
   };
 
   const openEdit = (d: DeviceWithParcels) => {
     setEditing(d);
-    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), parcel_names: [...d.parcel_names] });
+    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), name: (d as any).name || "", parcel_names: [...d.parcel_names] });
     setDialogOpen(true);
   };
 
@@ -74,7 +74,7 @@ export default function GpsDevicesTab() {
       return;
     }
     setSubmitting(true);
-    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30 };
+    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30, name: form.name || null };
 
     let deviceId: string;
 
@@ -145,6 +145,7 @@ export default function GpsDevicesTab() {
           <Table>
              <TableHeader>
               <TableRow>
+                <TableHead>Nombre</TableHead>
                 <TableHead>IMEI</TableHead>
                 <TableHead>SIM</TableHead>
                 <TableHead>Modelo</TableHead>
@@ -156,6 +157,7 @@ export default function GpsDevicesTab() {
             <TableBody>
               {devices.map((d) => (
                 <TableRow key={d.id}>
+                  <TableCell className="font-medium">{(d as any).name || <span className="text-muted-foreground">—</span>}</TableCell>
                   <TableCell className="font-mono text-sm">{d.imei}</TableCell>
                   <TableCell>{d.sim_number || "—"}</TableCell>
                   <TableCell>{d.model || "—"}</TableCell>
@@ -176,7 +178,7 @@ export default function GpsDevicesTab() {
                 </TableRow>
               ))}
               {devices.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -187,6 +189,7 @@ export default function GpsDevicesTab() {
         <DialogContent className="sm:max-w-md border-border">
           <DialogHeader><DialogTitle className="font-display">{editing ? "Editar dispositivo" : "Nuevo dispositivo"}</DialogTitle></DialogHeader>
           <div className="space-y-4">
+            <div className="space-y-2"><Label>Nombre</Label><Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej: Sirena Entrada Principal" /></div>
             <div className="space-y-2"><Label>IMEI</Label><Input value={form.imei} onChange={(e) => setForm((f) => ({ ...f, imei: e.target.value }))} placeholder="Ej: 123456789012345" /></div>
             <div className="space-y-2"><Label>Número SIM</Label><Input value={form.sim_number} onChange={(e) => setForm((f) => ({ ...f, sim_number: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Modelo</Label><Input value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} placeholder="Ej: VT08S" /></div>
