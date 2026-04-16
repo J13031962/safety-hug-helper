@@ -9,6 +9,7 @@ interface RegisteredUser {
   phone_number: string;
   house_number: string | null;
   parcel_name: string | null;
+  is_parcel_admin: boolean | null;
 }
 
 interface PhoneGateProps {
