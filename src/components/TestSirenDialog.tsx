@@ -76,10 +76,21 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
         console.warn("[Test] GPS error:", gpsErr);
       }
 
-      // Send SIA OP event for each parcel this siren belongs to
+      // Send SIA OP event and WhatsApp notification for each parcel
+      const displayName = siren.name || siren.model || siren.imei;
       for (const parcel of siren.parcel_names) {
         await supabase.functions.invoke("send-sia-event", {
           body: { alarm_type: "test", parcel_name: parcel },
+        });
+
+        // Send WhatsApp notification
+        await supabase.functions.invoke("send-whatsapp", {
+          body: {
+            alarm_type: "test",
+            sender_name: userName || "Admin",
+            parcel_name: parcel,
+            siren_name: displayName,
+          },
         });
       }
 
@@ -90,12 +101,11 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
           sender_name: userName || "Admin",
           parcel_name: parcel,
           status: "resolved",
-          observations: `Prueba de sirena: ${siren.name || siren.model || siren.imei}`,
+          observations: `Prueba de sirena: ${displayName}`,
         });
       }
 
       setResults((r) => ({ ...r, [siren.id]: "success" }));
-      const displayName = siren.name || siren.model || siren.imei;
       toast({ title: "Sirena activada", description: `${displayName} — se apagará en ${siren.relay_duration}s` });
     } catch {
       setResults((r) => ({ ...r, [siren.id]: "error" }));
