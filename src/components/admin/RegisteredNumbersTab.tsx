@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Phone } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Shield } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type RegisteredNumber = Tables<"registered_numbers">;
@@ -19,7 +20,6 @@ interface Parcel {
   whatsapp_group_id: string | null;
 }
 
-// Group registered numbers by phone
 interface GroupedNumber {
   phone_number: string;
   owner_name: string;
@@ -27,6 +27,7 @@ interface GroupedNumber {
   parcels: string[];
   ids: string[];
   rows: RegisteredNumber[];
+  is_parcel_admin: boolean;
 }
 
 export default function RegisteredNumbersTab() {
@@ -35,10 +36,9 @@ export default function RegisteredNumbersTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState<string | null>(null);
-  const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_names: [] as string[], user_numbers: {} as Record<string, string> });
+  const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_names: [] as string[], user_numbers: {} as Record<string, string>, is_parcel_admin: false });
   const [submitting, setSubmitting] = useState(false);
 
-  // Rename parcel dialog
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameFrom, setRenameFrom] = useState("");
   const [renameTo, setRenameTo] = useState("");
@@ -50,7 +50,6 @@ export default function RegisteredNumbersTab() {
     return [...new Set([...fromNumbers, ...fromParcelsTable])].sort();
   }, [numbers, parcels]);
 
-  // Group numbers by phone_number for display
   const grouped = useMemo(() => {
     const map = new Map<string, GroupedNumber>();
     for (const n of numbers) {
@@ -60,6 +59,7 @@ export default function RegisteredNumbersTab() {
         if (n.parcel_name && !g.parcels.includes(n.parcel_name)) g.parcels.push(n.parcel_name);
         g.ids.push(n.id);
         g.rows.push(n);
+        if (n.is_parcel_admin) g.is_parcel_admin = true;
       } else {
         map.set(key, {
           phone_number: n.phone_number,
@@ -68,6 +68,7 @@ export default function RegisteredNumbersTab() {
           parcels: n.parcel_name ? [n.parcel_name] : [],
           ids: [n.id],
           rows: [n],
+          is_parcel_admin: !!n.is_parcel_admin,
         });
       }
     }
@@ -89,7 +90,7 @@ export default function RegisteredNumbersTab() {
 
   const openCreate = () => {
     setEditingPhone(null);
-    setForm({ owner_name: "", phone_number: "", house_number: "", parcel_names: [], user_numbers: {} });
+    setForm({ owner_name: "", phone_number: "", house_number: "", parcel_names: [], user_numbers: {}, is_parcel_admin: false });
     setDialogOpen(true);
   };
 
@@ -107,6 +108,7 @@ export default function RegisteredNumbersTab() {
       house_number: g.house_number || "",
       parcel_names: [...g.parcels],
       user_numbers: userNums,
+      is_parcel_admin: g.is_parcel_admin,
     });
     setDialogOpen(true);
   };
@@ -133,7 +135,6 @@ export default function RegisteredNumbersTab() {
 
     try {
       if (editingPhone) {
-        // Delete existing rows for this phone
         const existing = grouped.find((g) => g.phone_number.replace(/\D/g, "") === editingPhone);
         if (existing) {
           for (const id of existing.ids) {
@@ -142,13 +143,13 @@ export default function RegisteredNumbersTab() {
         }
       }
 
-      // Insert one row per parcel
       const rows = form.parcel_names.map((parcel_name) => ({
         owner_name: form.owner_name,
         phone_number: form.phone_number,
         house_number: form.house_number || null,
         parcel_name,
         user_number: form.user_numbers[parcel_name]?.trim() || null,
+        is_parcel_admin: form.is_parcel_admin,
       }));
 
       const { error } = await supabase.from("registered_numbers").insert(rows);
@@ -226,7 +227,16 @@ export default function RegisteredNumbersTab() {
             <TableBody>
               {grouped.map((g) => (
                 <TableRow key={g.ids[0]}>
-                  <TableCell className="font-medium">{g.owner_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      {g.owner_name}
+                      {g.is_parcel_admin && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emergency-medical/20 text-emergency-medical font-medium">
+                          <Shield className="w-3 h-3" /> Admin
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{g.phone_number}</TableCell>
                   <TableCell>{g.house_number || "—"}</TableCell>
                   <TableCell>
@@ -254,7 +264,6 @@ export default function RegisteredNumbersTab() {
         )}
       </CardContent>
 
-      {/* Create/Edit dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md border-border">
           <DialogHeader><DialogTitle className="font-display">{editingPhone ? "Editar número" : "Nuevo número"}</DialogTitle></DialogHeader>
@@ -263,7 +272,6 @@ export default function RegisteredNumbersTab() {
             <div className="space-y-2"><Label>Teléfono WhatsApp</Label><Input value={form.phone_number} onChange={(e) => setForm((f) => ({ ...f, phone_number: e.target.value }))} placeholder="+58 412 1234567" /></div>
             <div className="space-y-2"><Label>Número de casa</Label><Input value={form.house_number} onChange={(e) => setForm((f) => ({ ...f, house_number: e.target.value }))} placeholder="Ej: A-12" /></div>
             
-            {/* Multi-select parcels with checkboxes and user_number */}
             <div className="space-y-2">
               <Label>Parcelaciones</Label>
               {uniqueParcels.length > 0 ? (
@@ -300,6 +308,21 @@ export default function RegisteredNumbersTab() {
                 <p className="text-xs text-muted-foreground">{form.parcel_names.length} parcelación(es) seleccionada(s)</p>
               )}
             </div>
+
+            {/* Admin de parcelación toggle */}
+            <div className="flex items-center justify-between rounded-lg border border-border p-3">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-emergency-medical" />
+                  Admin de parcelación
+                </Label>
+                <p className="text-xs text-muted-foreground">Permite probar sirenas individualmente</p>
+              </div>
+              <Switch
+                checked={form.is_parcel_admin}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, is_parcel_admin: v }))}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
@@ -308,7 +331,6 @@ export default function RegisteredNumbersTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Rename parcel dialog */}
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent className="sm:max-w-md border-border">
           <DialogHeader><DialogTitle className="font-display">Renombrar parcela</DialogTitle></DialogHeader>

@@ -9,6 +9,7 @@ interface RegisteredUser {
   phone_number: string;
   house_number: string | null;
   parcel_name: string | null;
+  is_parcel_admin: boolean | null;
 }
 
 interface PhoneGateProps {
@@ -36,7 +37,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
           const digits = settings.phoneNumber.replace(/\D/g, "");
           supabase
             .from("registered_numbers")
-            .select("phone_number, owner_name, house_number, parcel_name")
+            .select("phone_number, owner_name, house_number, parcel_name, is_parcel_admin")
             .then(({ data }) => {
               const matches = data?.filter((r) => {
                 const rd = r.phone_number.replace(/\D/g, "");
@@ -48,7 +49,8 @@ export default function PhoneGate({ children }: PhoneGateProps) {
                   houseNumber: m.house_number || "",
                   ownerName: m.owner_name,
                 }));
-                const updated = { ...settings, parcels, parcelName: parcels[0].parcelName, houseNumber: parcels[0].houseNumber, senderName: parcels[0].ownerName };
+                const isParcelAdmin = matches.some((m) => !!(m as any).is_parcel_admin);
+                const updated = { ...settings, parcels, parcelName: parcels[0].parcelName, houseNumber: parcels[0].houseNumber, senderName: parcels[0].ownerName, isParcelAdmin };
                 localStorage.setItem("sosalerta_settings", JSON.stringify(updated));
               }
               setVerified(true);
@@ -78,7 +80,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
     try {
       const { data: allNumbers } = await supabase
         .from("registered_numbers")
-        .select("phone_number, owner_name, house_number, parcel_name");
+        .select("phone_number, owner_name, house_number, parcel_name, is_parcel_admin");
 
     const matches = allNumbers?.filter((r) => {
         const rd = normalizeDigits(r.phone_number);
@@ -99,6 +101,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
       }));
 
       const first = parcels[0];
+      const isParcelAdmin = matches.some((m) => !!(m as any).is_parcel_admin);
 
       // Save to localStorage so ConfirmDialog and the app can use it
       const settings = {
@@ -108,6 +111,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
         parcelName: first.parcelName,
         phoneVerified: true,
         parcels,
+        isParcelAdmin: isParcelAdmin,
       };
       localStorage.setItem("sosalerta_settings", JSON.stringify(settings));
       setVerified(true);

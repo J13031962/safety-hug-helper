@@ -6,47 +6,66 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Radio } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type GpsDevice = Tables<"gps_devices">;
 
+interface DeviceWithParcels extends GpsDevice {
+  parcel_names: string[];
+}
+
 export default function GpsDevicesTab() {
-  const [devices, setDevices] = useState<GpsDevice[]>([]);
+  const [devices, setDevices] = useState<DeviceWithParcels[]>([]);
   const [parcels, setParcels] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<GpsDevice | null>(null);
-  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_name: "" });
+  const [editing, setEditing] = useState<DeviceWithParcels | null>(null);
+  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_names: [] as string[] });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchDevices = async () => {
     setLoading(true);
-    const { data } = await supabase.from("gps_devices").select("*").order("created_at", { ascending: false });
-    setDevices(data || []);
+    const [devRes, dpRes] = await Promise.all([
+      supabase.from("gps_devices").select("*").order("created_at", { ascending: false }),
+      supabase.from("gps_device_parcels").select("device_id, parcel_name"),
+    ]);
+    const devs = devRes.data || [];
+    const dps = dpRes.data || [];
+    const mapped: DeviceWithParcels[] = devs.map((d) => ({
+      ...d,
+      parcel_names: dps.filter((dp) => dp.device_id === d.id).map((dp) => dp.parcel_name),
+    }));
+    setDevices(mapped);
     setLoading(false);
   };
 
   const fetchParcels = async () => {
-    const { data } = await supabase.from("registered_numbers").select("parcel_name");
-    const unique = [...new Set((data || []).map(r => r.parcel_name).filter(Boolean))] as string[];
-    setParcels(unique.sort());
+    const { data } = await supabase.from("parcels").select("name").order("name");
+    setParcels((data || []).map((p) => p.name));
   };
 
   useEffect(() => { fetchDevices(); fetchParcels(); }, []);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_name: "" });
+    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", parcel_names: [] });
     setDialogOpen(true);
   };
 
-  const openEdit = (d: GpsDevice) => {
+  const openEdit = (d: DeviceWithParcels) => {
     setEditing(d);
-    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), parcel_name: d.parcel_name || "" });
+    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), parcel_names: [...d.parcel_names] });
     setDialogOpen(true);
+  };
+
+  const toggleParcel = (name: string) => {
+    setForm((f) => ({
+      ...f,
+      parcel_names: f.parcel_names.includes(name) ? f.parcel_names.filter((p) => p !== name) : [...f.parcel_names, name],
+    }));
   };
 
   const handleSubmit = async () => {
@@ -55,23 +74,35 @@ export default function GpsDevicesTab() {
       return;
     }
     setSubmitting(true);
-    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30, parcel_name: form.parcel_name || null };
+    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30 };
+
+    let deviceId: string;
 
     if (editing) {
       const { error } = await supabase.from("gps_devices").update(payload).eq("id", editing.id);
-      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-      else toast({ title: "Dispositivo actualizado" });
+      if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); setSubmitting(false); return; }
+      deviceId = editing.id;
+      // Delete old parcel links
+      await supabase.from("gps_device_parcels").delete().eq("device_id", deviceId);
     } else {
-      const { error } = await supabase.from("gps_devices").insert(payload);
-      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-      else toast({ title: "Dispositivo registrado" });
+      const { data, error } = await supabase.from("gps_devices").insert(payload).select("id").single();
+      if (error || !data) { toast({ title: "Error", description: error?.message || "Error al crear", variant: "destructive" }); setSubmitting(false); return; }
+      deviceId = data.id;
     }
+
+    // Insert parcel links
+    if (form.parcel_names.length > 0) {
+      const rows = form.parcel_names.map((parcel_name) => ({ device_id: deviceId, parcel_name }));
+      await supabase.from("gps_device_parcels").insert(rows);
+    }
+
+    toast({ title: editing ? "Dispositivo actualizado" : "Dispositivo registrado" });
     setDialogOpen(false);
     setSubmitting(false);
     fetchDevices();
   };
 
-  const handleDelete = async (d: GpsDevice) => {
+  const handleDelete = async (d: DeviceWithParcels) => {
     if (!confirm(`¿Eliminar dispositivo ${d.imei}?`)) return;
     const { error } = await supabase.from("gps_devices").delete().eq("id", d.id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -117,7 +148,7 @@ export default function GpsDevicesTab() {
                 <TableHead>IMEI</TableHead>
                 <TableHead>SIM</TableHead>
                 <TableHead>Modelo</TableHead>
-                <TableHead>Parcelación</TableHead>
+                <TableHead>Parcelaciones</TableHead>
                 <TableHead>Duración Relay</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
@@ -128,7 +159,13 @@ export default function GpsDevicesTab() {
                   <TableCell className="font-mono text-sm">{d.imei}</TableCell>
                   <TableCell>{d.sim_number || "—"}</TableCell>
                   <TableCell>{d.model || "—"}</TableCell>
-                  <TableCell>{d.parcel_name || "—"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {d.parcel_names.length > 0 ? d.parcel_names.map((p) => (
+                        <span key={p} className="inline-block text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">{p}</span>
+                      )) : <span className="text-xs text-muted-foreground">—</span>}
+                    </div>
+                  </TableCell>
                   <TableCell>{d.relay_duration ?? 30}s</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -154,14 +191,22 @@ export default function GpsDevicesTab() {
             <div className="space-y-2"><Label>Número SIM</Label><Input value={form.sim_number} onChange={(e) => setForm((f) => ({ ...f, sim_number: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Modelo</Label><Input value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} placeholder="Ej: VT08S" /></div>
             <div className="space-y-2">
-              <Label>Parcelación</Label>
-              <Select value={form.parcel_name} onValueChange={(v) => setForm((f) => ({ ...f, parcel_name: v === "__none__" ? "" : v }))}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar parcelación" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Sin asignar</SelectItem>
-                  {parcels.map((p) => (<SelectItem key={p} value={p}>{p}</SelectItem>))}
-                </SelectContent>
-              </Select>
+              <Label>Parcelaciones</Label>
+              {parcels.length > 0 ? (
+                <div className="max-h-48 overflow-y-auto rounded-md border border-border p-2 space-y-1">
+                  {parcels.map((p) => (
+                    <label key={p} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer transition-colors">
+                      <Checkbox checked={form.parcel_names.includes(p)} onCheckedChange={() => toggleParcel(p)} />
+                      <span className="text-sm">{p}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No hay parcelaciones. Créalas en la pestaña Parcelas.</p>
+              )}
+              {form.parcel_names.length > 0 && (
+                <p className="text-xs text-muted-foreground">{form.parcel_names.length} parcelación(es) seleccionada(s)</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Duración de activación (segundos)</Label>

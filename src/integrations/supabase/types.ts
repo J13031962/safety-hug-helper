@@ -65,6 +65,35 @@ export type Database = {
         }
         Relationships: []
       }
+      gps_device_parcels: {
+        Row: {
+          created_at: string | null
+          device_id: string
+          id: string
+          parcel_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          device_id: string
+          id?: string
+          parcel_name: string
+        }
+        Update: {
+          created_at?: string | null
+          device_id?: string
+          id?: string
+          parcel_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gps_device_parcels_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "gps_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gps_devices: {
         Row: {
           created_at: string
@@ -72,7 +101,6 @@ export type Database = {
           id: string
           imei: string
           model: string | null
-          parcel_name: string | null
           relay_active_until: string | null
           relay_duration: number
           sim_number: string | null
@@ -83,7 +111,6 @@ export type Database = {
           id?: string
           imei: string
           model?: string | null
-          parcel_name?: string | null
           relay_active_until?: string | null
           relay_duration?: number
           sim_number?: string | null
@@ -94,7 +121,6 @@ export type Database = {
           id?: string
           imei?: string
           model?: string | null
-          parcel_name?: string | null
           relay_active_until?: string | null
           relay_duration?: number
           sim_number?: string | null
@@ -197,6 +223,7 @@ export type Database = {
           created_at: string
           house_number: string | null
           id: string
+          is_parcel_admin: boolean | null
           owner_name: string
           parcel_name: string | null
           phone_number: string
@@ -207,6 +234,7 @@ export type Database = {
           created_at?: string
           house_number?: string | null
           id?: string
+          is_parcel_admin?: boolean | null
           owner_name: string
           parcel_name?: string | null
           phone_number: string
@@ -217,6 +245,7 @@ export type Database = {
           created_at?: string
           house_number?: string | null
           id?: string
+          is_parcel_admin?: boolean | null
           owner_name?: string
           parcel_name?: string | null
           phone_number?: string
