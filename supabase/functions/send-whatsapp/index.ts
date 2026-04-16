@@ -86,6 +86,7 @@ Deno.serve(async (req) => {
     const label = ALARM_LABELS[alarm_type] || `🚨 ${alarm_type?.toUpperCase()}`;
     let msg = `*SmartSOS informa:*\n\n${label}\n`;
     if (sender_name) msg += `\n👤 ${sender_name}`;
+    if (siren_name) msg += `\n📡 Sirena: ${siren_name}`;
     if (house_number) msg += `\n🏠 Casa: ${house_number}`;
     if (parcel_name) msg += `\n📍 Parcela: ${parcel_name}`;
     if (address) msg += `\n📌 ${address}`;
