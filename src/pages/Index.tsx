@@ -167,6 +167,7 @@ const IndexContent = () => {
         open={testDialogOpen}
         onClose={() => setTestDialogOpen(false)}
         userParcels={userParcelNames}
+        userName={senderName}
       />
     </div>
   );
