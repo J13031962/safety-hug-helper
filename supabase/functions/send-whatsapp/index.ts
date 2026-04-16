@@ -11,6 +11,7 @@ const ALARM_LABELS: Record<string, string> = {
   medical: "🏥 EMERGENCIA MÉDICA",
   fire: "🔥 INCENDIO",
   disaster: "⚠️ DESASTRE",
+  test: "🔔 PRUEBA DE SIRENA",
 };
 
 const normalize = (phone: string) => {
