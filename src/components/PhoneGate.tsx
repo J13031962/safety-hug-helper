@@ -49,7 +49,8 @@ export default function PhoneGate({ children }: PhoneGateProps) {
                   houseNumber: m.house_number || "",
                   ownerName: m.owner_name,
                 }));
-                const updated = { ...settings, parcels, parcelName: parcels[0].parcelName, houseNumber: parcels[0].houseNumber, senderName: parcels[0].ownerName };
+                const isParcelAdmin = matches.some((m) => !!(m as any).is_parcel_admin);
+                const updated = { ...settings, parcels, parcelName: parcels[0].parcelName, houseNumber: parcels[0].houseNumber, senderName: parcels[0].ownerName, isParcelAdmin };
                 localStorage.setItem("sosalerta_settings", JSON.stringify(updated));
               }
               setVerified(true);
