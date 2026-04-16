@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
       latitude,
       longitude,
       address,
+      siren_name,
     } = body;
 
     const supabase = createClient(
