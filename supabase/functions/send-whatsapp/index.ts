@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
       .join(", ");
     const mapQuery = hasCoords ? `${lat},${lng}` : (address?.trim() || fallbackLocation);
 
-    if (mapQuery) {
+    if (mapQuery && alarm_type !== "test") {
       msg += `\n🗺️ https://maps.google.com/?q=${encodeURIComponent(mapQuery)}`;
     }
 
