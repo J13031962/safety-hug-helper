@@ -85,11 +85,18 @@ Deno.serve(async (req) => {
     // Build message
     const label = ALARM_LABELS[alarm_type] || `🚨 ${alarm_type?.toUpperCase()}`;
     let msg = `*SmartSOS informa:*\n\n${label}\n`;
-    if (sender_name) msg += `\n👤 ${sender_name}`;
-    if (siren_name) msg += `\n📡 Sirena: ${siren_name}`;
-    if (house_number) msg += `\n🏠 Casa: ${house_number}`;
-    if (parcel_name) msg += `\n📍 Parcela: ${parcel_name}`;
-    if (address) msg += `\n📌 ${address}`;
+
+    if (alarm_type === "test") {
+      const sirenLabel = siren_name ? `"${siren_name}"` : "";
+      msg += `\nLa sirena ${sirenLabel} fue activada en modo de prueba por un administrador de la comunidad.`;
+      if (parcel_name) msg += `\n\n📍 Parcela: ${parcel_name}`;
+    } else {
+      if (sender_name) msg += `\n👤 ${sender_name}`;
+      if (siren_name) msg += `\n📡 Sirena: ${siren_name}`;
+      if (house_number) msg += `\n🏠 Casa: ${house_number}`;
+      if (parcel_name) msg += `\n📍 Parcela: ${parcel_name}`;
+      if (address) msg += `\n📌 ${address}`;
+    }
 
     const lat = latitude !== null && latitude !== undefined ? Number(latitude) : NaN;
     const lng = longitude !== null && longitude !== undefined ? Number(longitude) : NaN;
