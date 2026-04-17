@@ -1,38 +1,27 @@
 
+Cambio simple: ajustar el mensaje de WhatsApp cuando `alarm_type === "test"` para no mostrar el nombre del usuario y usar un texto genérico.
 
-## Plan: Enviar mensaje WhatsApp en pruebas de sirena
+### Cambio en `supabase/functions/send-whatsapp/index.ts`
 
-### Resumen
-Cuando un admin de parcelación activa una prueba de sirena, enviar un mensaje WhatsApp al grupo de la parcela usando el mismo formato actual pero indicando que es una prueba e incluyendo el nombre de la sirena disparada.
+Cuando `alarm_type === "test"`, el mensaje será:
 
-### Cambios
-
-#### 1. `send-whatsapp/index.ts` — Soporte para tipo "test"
-- Agregar `test` al mapa `ALARM_LABELS`: `test: "🔔 PRUEBA DE SIRENA"`
-- Leer un nuevo campo opcional `siren_name` del body
-- Si `siren_name` está presente, agregarlo al mensaje: `📡 Sirena: {siren_name}`
-
-#### 2. `TestSirenDialog.tsx` — Invocar send-whatsapp tras activar
-- Después de activar la sirena y enviar el evento SIA, llamar `send-whatsapp` para cada parcela de la sirena con:
-  - `alarm_type: "test"`
-  - `sender_name`: nombre del usuario
-  - `parcel_name`: parcela
-  - `siren_name`: nombre/modelo/IMEI de la sirena activada
-
-### Formato del mensaje WhatsApp
 ```
 *SmartSOS informa:*
 
 🔔 PRUEBA DE SIRENA
 
-👤 Juan Pérez
-📡 Sirena: Entrada Principal
-📍 Parcela: Teleguardia
+La sirena "{siren_name}" fue activada en modo de prueba por un administrador de la comunidad.
+
+📍 Parcela: {parcel_name}
+
+💬 Chat en grupo: {invite_link}
 
 🌐 www.teleguardia.com
 ```
 
-### Archivos a modificar
-- `supabase/functions/send-whatsapp/index.ts` — agregar label "test" y campo `siren_name`
-- `src/components/TestSirenDialog.tsx` — invocar `send-whatsapp` en `handleActivate`
+Lógica:
+- Si `alarm_type === "test"`: omitir la línea `👤 {sender_name}` y la línea `📡 Sirena: ...`, y en su lugar agregar la frase descriptiva con el nombre de la sirena.
+- Para el resto de alarmas, mantener el formato actual sin cambios.
 
+### Archivo a modificar
+- `supabase/functions/send-whatsapp/index.ts` — bifurcar la construcción del mensaje según `alarm_type === "test"`.
