@@ -6,33 +6,70 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Recognized panic/SOS alarm types from Traccar (GT06 and others)
+// STRICT whitelist: only real SOS/panic-button events
 const PANIC_ALARMS = new Set([
   "sos",
   "panic",
-  "emergency",
-  "alarm",
+  "panicbutton",
+  "sosbutton",
 ]);
 
-function isPanicEvent(payload: any): boolean {
-  const evt = payload?.event;
-  if (!evt) return false;
+// Explicit blacklist: never treat these as panic, even if type === "alarm"
+const NON_PANIC_ALARMS = new Set([
+  "vibration", "movement", "motion", "shock", "tow", "tampering", "tamper",
+  "geofenceenter", "geofenceexit", "geofence",
+  "lowbattery", "lowpower", "powercut", "powerrestored", "powerOn", "poweroff",
+  "overspeed", "hardacceleration", "hardbraking", "hardcornering",
+  "ignitionon", "ignitionoff",
+  "fault", "maintenance",
+  "online", "offline", "statusonline", "statusoffline",
+  "devicemoving", "devicestopped", "deviceoverspeed",
+]);
 
-  // Traccar event type can be "alarm" with attributes.alarm = "sos"
-  if (evt.type === "alarm") {
-    const alarmName = String(evt.attributes?.alarm || "").toLowerCase();
-    if (PANIC_ALARMS.has(alarmName)) return true;
+function norm(v: any): string {
+  return String(v || "").toLowerCase().replace(/[\s_-]/g, "");
+}
+
+function classify(payload: any): { panic: boolean; reason: string } {
+  const evt = payload?.event;
+  if (!evt) return { panic: false, reason: "no_event" };
+
+  const evtType = norm(evt.type);
+
+  // Always ignore non-event noise
+  if (evtType === "commandresult") return { panic: false, reason: "commandResult" };
+
+  const evtAlarm = norm(evt.attributes?.alarm);
+  const posAlarm = norm(payload?.position?.attributes?.alarm);
+  const alarmValue = evtAlarm || posAlarm;
+
+  // 1) Direct event type as panic (e.g. type === "sos")
+  if (PANIC_ALARMS.has(evtType)) {
+    return { panic: true, reason: `event_type=${evtType}` };
   }
 
-  // Some configs send type directly as "sos" or "panic"
-  const t = String(evt.type || "").toLowerCase();
-  if (PANIC_ALARMS.has(t)) return true;
+  // 2) type === "alarm" with attributes.alarm
+  if (evtType === "alarm") {
+    if (!alarmValue) return { panic: false, reason: "alarm_without_value" };
+    if (NON_PANIC_ALARMS.has(alarmValue)) {
+      return { panic: false, reason: `blacklisted_alarm=${alarmValue}` };
+    }
+    if (PANIC_ALARMS.has(alarmValue)) {
+      return { panic: true, reason: `alarm_value=${alarmValue}` };
+    }
+    return { panic: false, reason: `unknown_alarm=${alarmValue}` };
+  }
 
-  // Position-level alarm attribute fallback
-  const posAlarm = String(payload?.position?.attributes?.alarm || "").toLowerCase();
-  if (posAlarm && PANIC_ALARMS.has(posAlarm)) return true;
+  // 3) Position-level alarm fallback (only if explicitly SOS)
+  if (posAlarm && PANIC_ALARMS.has(posAlarm)) {
+    return { panic: true, reason: `position_alarm=${posAlarm}` };
+  }
 
-  return false;
+  return { panic: false, reason: `event_type=${evtType}` };
+}
+
+function isPanicEvent(payload: any): boolean {
+  return classify(payload).panic;
 }
 
 Deno.serve(async (req) => {
@@ -58,13 +95,15 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log("[TraccarWH] Payload:", JSON.stringify(payload));
 
-    if (!isPanicEvent(payload)) {
-      console.log("[TraccarWH] Ignored: not a panic/SOS event");
-      return new Response(JSON.stringify({ success: true, ignored: true, reason: "not_panic" }), {
+    const { panic, reason } = classify(payload);
+    if (!panic) {
+      console.log(`[TraccarWH] Ignored: ${reason}`);
+      return new Response(JSON.stringify({ success: true, ignored: true, reason }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    console.log(`[TraccarWH] Panic accepted: ${reason}`);
 
     const imei = String(payload?.device?.uniqueId || "").trim();
     const deviceName = payload?.device?.name || null;
