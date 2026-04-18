@@ -95,13 +95,15 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log("[TraccarWH] Payload:", JSON.stringify(payload));
 
-    if (!isPanicEvent(payload)) {
-      console.log("[TraccarWH] Ignored: not a panic/SOS event");
-      return new Response(JSON.stringify({ success: true, ignored: true, reason: "not_panic" }), {
+    const { panic, reason } = classify(payload);
+    if (!panic) {
+      console.log(`[TraccarWH] Ignored: ${reason}`);
+      return new Response(JSON.stringify({ success: true, ignored: true, reason }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    console.log(`[TraccarWH] Panic accepted: ${reason}`);
 
     const imei = String(payload?.device?.uniqueId || "").trim();
     const deviceName = payload?.device?.name || null;
