@@ -1,71 +1,34 @@
 
-## Plan: Recibir alarmas de pánico físicas desde GPS Traccar
+Los logs muestran que Traccar ahora SÍ está reenviando eventos al webhook y disparando alarmas correctamente. El problema: actualmente filtramos por nombres genéricos (`alarm`, `sos`, `panic`, `emergency`), pero `attributes.alarm` puede traer valores como `vibration`, `movement`, `geofenceExit`, `lowBattery`, `tow`, `shock`, etc., que NO son emergencias reales del botón SOS y podrían disparar la alarma por error.
 
-### Contexto
-Actualmente el flujo de alarmas funciona así:
-- Usuario abre la app → presiona botón → se inserta en `alarms` → dispara `send-gps-command` (siren ON) + `send-whatsapp` + `send-sia-event` (CRA).
+## Plan: Restringir webhook solo a SOS real del botón físico
 
-Lo que pides: cuando alguien presione el **botón físico de pánico** del GPS (sin app), Traccar reciba el evento y nosotros también lo procesemos para disparar el mismo flujo (sirena, WhatsApp, CRA, registro en `/operador` y `/admin`).
+### Cambio en `supabase/functions/traccar-webhook/index.ts`
 
-### ¿Tenemos la estructura? Parcialmente.
-Lo que ya existe:
-- `gps_devices` con IMEI y `gps_device_parcels` (multi-parcela).
-- `send-gps-command`, `send-whatsapp`, `send-sia-event`.
-- Tabla `alarms` con `alarm_type`.
+Endurecer `isPanicEvent()` para aceptar **solo SOS explícito** y rechazar cualquier otra alarma:
 
-Lo que falta: un **endpoint público (webhook)** que Traccar pueda llamar cuando detecta el evento de pánico, y configurar Traccar para que lo llame.
+1. **Lista blanca estricta** — solo estos valores cuentan como pánico:
+   - `sos`
+   - `panic`  
+   - `panicButton`
+   - `sosButton`
+   
+   Quitar `"alarm"` y `"emergency"` (demasiado genéricos).
 
----
+2. **Lista negra explícita** — rechazar siempre aunque el evento sea tipo `alarm`:
+   - `vibration`, `movement`, `motion`, `shock`, `tow`, `tampering`
+   - `geofenceEnter`, `geofenceExit`
+   - `lowBattery`, `lowPower`, `powerCut`, `powerRestored`
+   - `overspeed`, `hardAcceleration`, `hardBraking`, `hardCornering`
+   - `ignitionOn`, `ignitionOff`
+   - `fault`, `maintenance`
 
-### Cambios propuestos
+3. **Ignorar `commandResult`** explícitamente (ya se ignoran pero dejarlo claro en log).
 
-#### 1. Nueva edge function `traccar-webhook` (pública, `verify_jwt = false`)
-- Recibe POST de Traccar con el payload de evento/posición.
-- Traccar envía algo como:
-  ```json
-  {
-    "event": { "type": "alarm", "deviceId": 123, "attributes": { "alarm": "sos" } },
-    "device": { "uniqueId": "355468592594287", "name": "..." },
-    "position": { "latitude": ..., "longitude": ... }
-  }
-  ```
-- Lógica:
-  1. Validar que sea evento de tipo `alarm` con `alarm == "sos"` (o similar — GT06 reporta SOS como "sos"/"panic").
-  2. Validar token compartido en header (ej. `X-Traccar-Token` con valor secreto `TRACCAR_WEBHOOK_TOKEN`) para evitar abuso público.
-  3. Buscar IMEI en `gps_devices` → obtener parcelas asociadas vía `gps_device_parcels`.
-  4. Para cada parcela, insertar fila en `alarms` con:
-     - `alarm_type: "panic"`
-     - `parcel_name: <parcela>`
-     - `sender_name: "Botón físico GPS"` (o nombre del device si tiene)
-     - `phone_number: null`
-     - `latitude`/`longitude` del payload si vienen
-     - `observations: "Activado desde botón físico del GPS <imei/name>"`
-  5. Llamar `send-gps-command` (con `imei` directo, modo no-test) → activa la sirena en esa parcela.
-  6. Llamar `send-whatsapp` por cada parcela.
-  7. Llamar `send-sia-event` con el evento PA.
+4. **Logging mejorado**: cuando se ignore, loguear el motivo (`alarm_value=vibration`) para auditar.
 
-#### 2. Secreto nuevo
-- `TRACCAR_WEBHOOK_TOKEN` — token compartido para validar que la llamada viene de Traccar y no de un atacante.
+### Recomendación adicional (configuración Traccar — opcional)
+Si quieres reducir aún más el ruido en el webhook, en Traccar puedes filtrar la notificación para que SOLO reenvíe el tipo de evento `sos` en lugar de todos. Pero con el filtro estricto en código ya estamos seguros aunque Traccar reenvíe todo.
 
-#### 3. Configuración en Traccar (instrucciones para el usuario, fuera del código)
-Después de desplegar la función, te daré:
-- URL del webhook: `https://xvojmfakqlzplbzaoqdi.supabase.co/functions/v1/traccar-webhook`
-- Cómo configurarla en Traccar: en `traccar.xml` agregar:
-  ```xml
-  <entry key='forward.enable'>true</entry>
-  <entry key='forward.type'>json</entry>
-  <entry key='forward.url'>https://.../functions/v1/traccar-webhook</entry>
-  <entry key='forward.header'>X-Traccar-Token: <token></entry>
-  ```
-  O mediante notificaciones por tipo (`alarm`) hacia un webhook.
-
-#### 4. Ajuste menor en `send-gps-command`
-Ya soporta `{ imei, action }` directo, así que el webhook puede invocarlo sin cambios. Pero necesitamos también disparar el flujo "alarma real" (programar engineResume con `relay_duration`). Para eso, el webhook insertará en `alarms` y llamará `send-gps-command` con el formato `{ alarm_type, alarm_id }` como hace el frontend hoy → reutiliza la lógica existente de scheduling.
-
-### Archivos
-- **Nuevo**: `supabase/functions/traccar-webhook/index.ts`
-- **Nuevo secreto**: `TRACCAR_WEBHOOK_TOKEN`
-- Sin cambios en frontend ni en otras funciones.
-
-### Después de implementar
-Te paso la URL exacta y el bloque de configuración para pegar en Traccar (sección "Computed Attributes" o "Notifications → Webhook" según versión).
+### Archivo a modificar
+- `supabase/functions/traccar-webhook/index.ts` — endurecer `isPanicEvent()` con whitelist + blacklist.
