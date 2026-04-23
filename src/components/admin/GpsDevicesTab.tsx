@@ -53,13 +53,13 @@ export default function GpsDevicesTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [] });
+    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [], panic_button_enabled: false });
     setDialogOpen(true);
   };
 
   const openEdit = (d: DeviceWithParcels) => {
     setEditing(d);
-    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), name: (d as any).name || "", parcel_names: [...d.parcel_names] });
+    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), name: (d as any).name || "", parcel_names: [...d.parcel_names], panic_button_enabled: !!(d as any).panic_button_enabled });
     setDialogOpen(true);
   };
 
