@@ -25,7 +25,7 @@ export default function GpsDevicesTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DeviceWithParcels | null>(null);
-  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [] as string[] });
+  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [] as string[], panic_button_enabled: false });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchDevices = async () => {
