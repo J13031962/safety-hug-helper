@@ -251,6 +251,21 @@ export default function GpsDevicesTab() {
               <Input type="number" min="5" max="300" value={form.relay_duration} onChange={(e) => setForm((f) => ({ ...f, relay_duration: e.target.value }))} placeholder="30" />
               <p className="text-xs text-muted-foreground">Tiempo que la sirena suena antes de apagarse automáticamente.</p>
             </div>
+            <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+              <div className="space-y-1">
+                <Label className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  Permitir botón físico de pánico (SOS)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Si está desactivado, presionar el SOS en este GPS NO disparará alarma.
+                </p>
+              </div>
+              <Switch
+                checked={form.panic_button_enabled}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, panic_button_enabled: v }))}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
