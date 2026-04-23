@@ -157,7 +157,7 @@ export default function GpsDevicesTab() {
           <p className="text-muted-foreground text-sm animate-pulse">Cargando...</p>
         ) : (
           <Table>
-             <TableHeader>
+            <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>IMEI</TableHead>
@@ -165,13 +165,23 @@ export default function GpsDevicesTab() {
                 <TableHead>Modelo</TableHead>
                 <TableHead>Parcelaciones</TableHead>
                 <TableHead>Duración Relay</TableHead>
+                <TableHead>Botón físico</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {devices.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell className="font-medium">{(d as any).name || <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <span>{(d as any).name || <span className="text-muted-foreground">—</span>}</span>
+                      {(d as any).panic_button_enabled && (
+                        <Badge variant="destructive" className="gap-1 text-[10px] px-1.5 py-0">
+                          <AlertTriangle className="w-3 h-3" /> SOS
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="font-mono text-sm">{d.imei}</TableCell>
                   <TableCell>{d.sim_number || "—"}</TableCell>
                   <TableCell>{d.model || "—"}</TableCell>
@@ -184,6 +194,17 @@ export default function GpsDevicesTab() {
                   </TableCell>
                   <TableCell>{d.relay_duration ?? 30}s</TableCell>
                   <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={!!(d as any).panic_button_enabled}
+                        onCheckedChange={(v) => togglePanicButton(d, v)}
+                      />
+                      <span className={`text-xs ${(d as any).panic_button_enabled ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                        {(d as any).panic_button_enabled ? "Activo" : "Inactivo"}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="w-4 h-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(d)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
@@ -192,7 +213,7 @@ export default function GpsDevicesTab() {
                 </TableRow>
               ))}
               {devices.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
