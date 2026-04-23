@@ -76,7 +76,7 @@ export default function GpsDevicesTab() {
       return;
     }
     setSubmitting(true);
-    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30, name: form.name || null };
+    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30, name: form.name || null, panic_button_enabled: form.panic_button_enabled };
 
     let deviceId: string;
 
