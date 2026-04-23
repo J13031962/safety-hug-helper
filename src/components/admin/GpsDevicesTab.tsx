@@ -7,8 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Radio } from "lucide-react";
+import { Plus, Pencil, Trash2, Radio, AlertTriangle } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type GpsDevice = Tables<"gps_devices">;
@@ -23,7 +25,7 @@ export default function GpsDevicesTab() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DeviceWithParcels | null>(null);
-  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [] as string[] });
+  const [form, setForm] = useState({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [] as string[], panic_button_enabled: false });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchDevices = async () => {
@@ -51,13 +53,13 @@ export default function GpsDevicesTab() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [] });
+    setForm({ imei: "", sim_number: "", model: "", relay_duration: "30", name: "", parcel_names: [], panic_button_enabled: false });
     setDialogOpen(true);
   };
 
   const openEdit = (d: DeviceWithParcels) => {
     setEditing(d);
-    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), name: (d as any).name || "", parcel_names: [...d.parcel_names] });
+    setForm({ imei: d.imei, sim_number: d.sim_number || "", model: d.model || "", relay_duration: String(d.relay_duration ?? 30), name: (d as any).name || "", parcel_names: [...d.parcel_names], panic_button_enabled: !!(d as any).panic_button_enabled });
     setDialogOpen(true);
   };
 
@@ -74,7 +76,7 @@ export default function GpsDevicesTab() {
       return;
     }
     setSubmitting(true);
-    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30, name: form.name || null };
+    const payload = { imei: form.imei, sim_number: form.sim_number || null, model: form.model || null, relay_duration: parseInt(form.relay_duration) || 30, name: form.name || null, panic_button_enabled: form.panic_button_enabled };
 
     let deviceId: string;
 
@@ -107,6 +109,18 @@ export default function GpsDevicesTab() {
     const { error } = await supabase.from("gps_devices").delete().eq("id", d.id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else { toast({ title: "Eliminado" }); fetchDevices(); }
+  };
+
+  const togglePanicButton = async (d: DeviceWithParcels, next: boolean) => {
+    // Optimistic
+    setDevices((prev) => prev.map((x) => x.id === d.id ? { ...x, panic_button_enabled: next } as DeviceWithParcels : x));
+    const { error } = await supabase.from("gps_devices").update({ panic_button_enabled: next }).eq("id", d.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      fetchDevices();
+      return;
+    }
+    toast({ title: next ? "Botón físico ACTIVADO" : "Botón físico desactivado", description: d.name || d.imei });
   };
 
   return (
@@ -143,7 +157,7 @@ export default function GpsDevicesTab() {
           <p className="text-muted-foreground text-sm animate-pulse">Cargando...</p>
         ) : (
           <Table>
-             <TableHeader>
+            <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>IMEI</TableHead>
@@ -151,13 +165,23 @@ export default function GpsDevicesTab() {
                 <TableHead>Modelo</TableHead>
                 <TableHead>Parcelaciones</TableHead>
                 <TableHead>Duración Relay</TableHead>
+                <TableHead>Botón físico</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {devices.map((d) => (
                 <TableRow key={d.id}>
-                  <TableCell className="font-medium">{(d as any).name || <span className="text-muted-foreground">—</span>}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <span>{(d as any).name || <span className="text-muted-foreground">—</span>}</span>
+                      {(d as any).panic_button_enabled && (
+                        <Badge variant="destructive" className="gap-1 text-[10px] px-1.5 py-0">
+                          <AlertTriangle className="w-3 h-3" /> SOS
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="font-mono text-sm">{d.imei}</TableCell>
                   <TableCell>{d.sim_number || "—"}</TableCell>
                   <TableCell>{d.model || "—"}</TableCell>
@@ -170,6 +194,17 @@ export default function GpsDevicesTab() {
                   </TableCell>
                   <TableCell>{d.relay_duration ?? 30}s</TableCell>
                   <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={!!(d as any).panic_button_enabled}
+                        onCheckedChange={(v) => togglePanicButton(d, v)}
+                      />
+                      <span className={`text-xs ${(d as any).panic_button_enabled ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                        {(d as any).panic_button_enabled ? "Activo" : "Inactivo"}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <div className="flex gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEdit(d)}><Pencil className="w-4 h-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => handleDelete(d)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
@@ -178,7 +213,7 @@ export default function GpsDevicesTab() {
                 </TableRow>
               ))}
               {devices.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No hay dispositivos</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -215,6 +250,21 @@ export default function GpsDevicesTab() {
               <Label>Duración de activación (segundos)</Label>
               <Input type="number" min="5" max="300" value={form.relay_duration} onChange={(e) => setForm((f) => ({ ...f, relay_duration: e.target.value }))} placeholder="30" />
               <p className="text-xs text-muted-foreground">Tiempo que la sirena suena antes de apagarse automáticamente.</p>
+            </div>
+            <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3">
+              <div className="space-y-1">
+                <Label className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                  Permitir botón físico de pánico (SOS)
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Si está desactivado, presionar el SOS en este GPS NO disparará alarma.
+                </p>
+              </div>
+              <Switch
+                checked={form.panic_button_enabled}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, panic_button_enabled: v }))}
+              />
             </div>
           </div>
           <DialogFooter>

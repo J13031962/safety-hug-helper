@@ -26,6 +26,10 @@ const NON_PANIC_ALARMS = new Set([
   "devicemoving", "devicestopped", "deviceoverspeed",
 ]);
 
+// In-memory idempotency cache (per-instance). Key = imei, value = last accepted timestamp ms.
+const RECENT_SOS = new Map<string, number>();
+const SOS_DEDUP_WINDOW_MS = 30_000;
+
 function norm(v: any): string {
   return String(v || "").toLowerCase().replace(/[\s_-]/g, "");
 }
@@ -36,19 +40,16 @@ function classify(payload: any): { panic: boolean; reason: string } {
 
   const evtType = norm(evt.type);
 
-  // Always ignore non-event noise
   if (evtType === "commandresult") return { panic: false, reason: "commandResult" };
 
   const evtAlarm = norm(evt.attributes?.alarm);
   const posAlarm = norm(payload?.position?.attributes?.alarm);
   const alarmValue = evtAlarm || posAlarm;
 
-  // 1) Direct event type as panic (e.g. type === "sos")
   if (PANIC_ALARMS.has(evtType)) {
     return { panic: true, reason: `event_type=${evtType}` };
   }
 
-  // 2) type === "alarm" with attributes.alarm
   if (evtType === "alarm") {
     if (!alarmValue) return { panic: false, reason: "alarm_without_value" };
     if (NON_PANIC_ALARMS.has(alarmValue)) {
@@ -60,16 +61,11 @@ function classify(payload: any): { panic: boolean; reason: string } {
     return { panic: false, reason: `unknown_alarm=${alarmValue}` };
   }
 
-  // 3) Position-level alarm fallback (only if explicitly SOS)
   if (posAlarm && PANIC_ALARMS.has(posAlarm)) {
     return { panic: true, reason: `position_alarm=${posAlarm}` };
   }
 
   return { panic: false, reason: `event_type=${evtType}` };
-}
-
-function isPanicEvent(payload: any): boolean {
-  return classify(payload).panic;
 }
 
 Deno.serve(async (req) => {
@@ -78,7 +74,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate shared token
     const expectedToken = Deno.env.get("TRACCAR_WEBHOOK_TOKEN");
     const providedToken =
       req.headers.get("x-traccar-token") ||
@@ -103,7 +98,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    console.log(`[TraccarWH] Panic accepted: ${reason}`);
 
     const imei = String(payload?.device?.uniqueId || "").trim();
     const deviceName = payload?.device?.name || null;
@@ -111,20 +105,39 @@ Deno.serve(async (req) => {
     const longitude = payload?.position?.longitude ?? null;
 
     if (!imei) {
+      console.warn("[TraccarWH] Panic event missing IMEI -> rejecting");
       return new Response(JSON.stringify({ success: false, error: "missing_imei" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    console.log(`[TraccarWH] Panic accepted: ${reason} | IMEI=${imei} | device_name=${deviceName}`);
+
+    // Idempotency: ignore duplicate SOS from same IMEI within window
+    const now = Date.now();
+    const last = RECENT_SOS.get(imei);
+    if (last && now - last < SOS_DEDUP_WINDOW_MS) {
+      console.log(`[TraccarWH] Duplicate SOS ignored for IMEI=${imei} (last ${now - last}ms ago)`);
+      return new Response(JSON.stringify({ success: true, ignored: true, reason: "duplicate_within_window", imei }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    RECENT_SOS.set(imei, now);
+    // Clean stale entries
+    for (const [k, ts] of RECENT_SOS) {
+      if (now - ts > SOS_DEDUP_WINDOW_MS * 2) RECENT_SOS.delete(k);
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const sb = createClient(supabaseUrl, supabaseKey);
 
-    // Find the device + its parcels
+    // Find the device by IMEI
     const { data: device, error: deviceErr } = await sb
       .from("gps_devices")
-      .select("id, imei, name, model")
+      .select("id, imei, name, model, panic_button_enabled")
       .eq("imei", imei)
       .maybeSingle();
 
@@ -136,13 +149,29 @@ Deno.serve(async (req) => {
       });
     }
 
+    // GATE: panic button must be explicitly enabled
+    if (!device.panic_button_enabled) {
+      console.log(`[TraccarWH] Ignored: panic_button_disabled | IMEI=${imei} | device=${device.name || device.id}`);
+      return new Response(JSON.stringify({
+        success: true,
+        ignored: true,
+        reason: "panic_button_disabled",
+        imei,
+        device: device.name || device.id,
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // STRICT ISOLATION: only parcels linked to THIS device.id
     const { data: deviceParcels, error: dpErr } = await sb
       .from("gps_device_parcels")
       .select("parcel_name")
       .eq("device_id", device.id);
 
     if (dpErr) {
-      console.error("[TraccarWH] DB error:", dpErr);
+      console.error("[TraccarWH] DB error fetching parcels:", dpErr);
       return new Response(JSON.stringify({ success: false, error: dpErr.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -150,6 +179,7 @@ Deno.serve(async (req) => {
     }
 
     const parcels = (deviceParcels || []).map((p: any) => p.parcel_name).filter(Boolean);
+    console.log(`[TraccarWH] IMEI=${imei} (device.id=${device.id}) -> parcels=${JSON.stringify(parcels)}`);
 
     if (parcels.length === 0) {
       console.warn(`[TraccarWH] No parcels associated with device ${imei}`);
@@ -166,7 +196,6 @@ Deno.serve(async (req) => {
     const results: any[] = [];
 
     for (const parcel_name of parcels) {
-      // 1) Insert alarm row
       const { data: alarmRow, error: alarmErr } = await sb
         .from("alarms")
         .insert({
@@ -189,23 +218,17 @@ Deno.serve(async (req) => {
       }
 
       const alarmId = alarmRow.id;
-      console.log(`[TraccarWH] Created alarm ${alarmId} for parcel ${parcel_name}`);
+      console.log(`[TraccarWH] AUDIT inserted alarm | IMEI=${imei} | parcel=${parcel_name} | alarm_id=${alarmId}`);
 
-      // 2) Trigger siren via send-gps-command (will schedule auto-off)
       try {
         const cmdRes = await sb.functions.invoke("send-gps-command", {
-          body: {
-            alarm_type: "panic",
-            alarm_id: alarmId,
-            parcel_name,
-          },
+          body: { alarm_type: "panic", alarm_id: alarmId, parcel_name },
         });
-        console.log(`[TraccarWH] send-gps-command result:`, JSON.stringify(cmdRes.data));
+        console.log(`[TraccarWH] send-gps-command [${parcel_name}]:`, JSON.stringify(cmdRes.data));
       } catch (e: any) {
-        console.error(`[TraccarWH] send-gps-command error:`, e.message);
+        console.error(`[TraccarWH] send-gps-command error [${parcel_name}]:`, e.message);
       }
 
-      // 3) Send WhatsApp to parcel group
       try {
         const waRes = await sb.functions.invoke("send-whatsapp", {
           body: {
@@ -217,22 +240,18 @@ Deno.serve(async (req) => {
             observations,
           },
         });
-        console.log(`[TraccarWH] send-whatsapp result:`, JSON.stringify(waRes.data));
+        console.log(`[TraccarWH] send-whatsapp [${parcel_name}]:`, JSON.stringify(waRes.data));
       } catch (e: any) {
-        console.error(`[TraccarWH] send-whatsapp error:`, e.message);
+        console.error(`[TraccarWH] send-whatsapp error [${parcel_name}]:`, e.message);
       }
 
-      // 4) Send SIA-DCS event to CRA
       try {
         const siaRes = await sb.functions.invoke("send-sia-event", {
-          body: {
-            alarm_type: "panic",
-            parcel_name,
-          },
+          body: { alarm_type: "panic", parcel_name },
         });
-        console.log(`[TraccarWH] send-sia-event result:`, JSON.stringify(siaRes.data));
+        console.log(`[TraccarWH] send-sia-event [${parcel_name}]:`, JSON.stringify(siaRes.data));
       } catch (e: any) {
-        console.error(`[TraccarWH] send-sia-event error:`, e.message);
+        console.error(`[TraccarWH] send-sia-event error [${parcel_name}]:`, e.message);
       }
 
       results.push({ parcel_name, success: true, alarm_id: alarmId });

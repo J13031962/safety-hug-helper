@@ -102,6 +102,7 @@ export type Database = {
           imei: string
           model: string | null
           name: string | null
+          panic_button_enabled: boolean
           relay_active_until: string | null
           relay_duration: number
           sim_number: string | null
@@ -113,6 +114,7 @@ export type Database = {
           imei: string
           model?: string | null
           name?: string | null
+          panic_button_enabled?: boolean
           relay_active_until?: string | null
           relay_duration?: number
           sim_number?: string | null
@@ -124,6 +126,7 @@ export type Database = {
           imei?: string
           model?: string | null
           name?: string | null
+          panic_button_enabled?: boolean
           relay_active_until?: string | null
           relay_duration?: number
           sim_number?: string | null
