@@ -111,6 +111,18 @@ export default function GpsDevicesTab() {
     else { toast({ title: "Eliminado" }); fetchDevices(); }
   };
 
+  const togglePanicButton = async (d: DeviceWithParcels, next: boolean) => {
+    // Optimistic
+    setDevices((prev) => prev.map((x) => x.id === d.id ? { ...x, panic_button_enabled: next } as DeviceWithParcels : x));
+    const { error } = await supabase.from("gps_devices").update({ panic_button_enabled: next }).eq("id", d.id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      fetchDevices();
+      return;
+    }
+    toast({ title: next ? "Botón físico ACTIVADO" : "Botón físico desactivado", description: d.name || d.imei });
+  };
+
   return (
     <Card className="border-border">
       <CardHeader className="pb-4 space-y-3">
