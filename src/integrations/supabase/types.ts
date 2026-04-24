@@ -96,6 +96,7 @@ export type Database = {
       }
       gps_devices: {
         Row: {
+          cra_user_number: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -108,6 +109,7 @@ export type Database = {
           sim_number: string | null
         }
         Insert: {
+          cra_user_number?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -120,6 +122,7 @@ export type Database = {
           sim_number?: string | null
         }
         Update: {
+          cra_user_number?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
