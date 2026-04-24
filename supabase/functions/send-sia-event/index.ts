@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { alarm_type, parcel_name, phone_number } = await req.json();
+    const { alarm_type, parcel_name, phone_number, cra_user_number, source } = await req.json();
 
     if (!alarm_type || !parcel_name) {
       return new Response(
@@ -68,9 +68,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get user_number from registered_number (zone)
+    // Determine zone (CRA user number)
     let zone = "001"; // default zone
-    if (phone_number) {
+
+    // Priority 1: explicit cra_user_number (from physical button)
+    if (cra_user_number && String(cra_user_number).trim()) {
+      zone = String(cra_user_number).trim().padStart(3, "0");
+      console.log(`[SIA] Using cra_user_number from ${source || "unknown"}: ${zone}`);
+    } else if (phone_number) {
+      // Priority 2: lookup by phone_number in registered_numbers
       const phoneDigits = phone_number.replace(/\D/g, "");
       const { data: regNumbers } = await sb
         .from("registered_numbers")

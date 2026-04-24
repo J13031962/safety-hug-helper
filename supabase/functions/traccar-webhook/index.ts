@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
     // Find the device by IMEI
     const { data: device, error: deviceErr } = await sb
       .from("gps_devices")
-      .select("id, imei, name, model, panic_button_enabled")
+      .select("id, imei, name, model, panic_button_enabled, cra_user_number")
       .eq("imei", imei)
       .maybeSingle();
 
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
     }
 
     const sirenLabel = device.name || device.model || imei;
-    const senderName = `Botón físico GPS${deviceName ? ` (${deviceName})` : ""}`;
+    const senderName = `Botón físico${deviceName ? ` (${deviceName})` : ""}`;
     const observations = `Activado desde botón físico del GPS ${sirenLabel} (IMEI ${imei})`;
 
     const results: any[] = [];
@@ -247,7 +247,12 @@ Deno.serve(async (req) => {
 
       try {
         const siaRes = await sb.functions.invoke("send-sia-event", {
-          body: { alarm_type: "panic", parcel_name },
+          body: {
+            alarm_type: "panic",
+            parcel_name,
+            cra_user_number: device.cra_user_number || null,
+            source: "physical_button",
+          },
         });
         console.log(`[TraccarWH] send-sia-event [${parcel_name}]:`, JSON.stringify(siaRes.data));
       } catch (e: any) {
