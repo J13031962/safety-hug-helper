@@ -247,7 +247,12 @@ Deno.serve(async (req) => {
 
       try {
         const siaRes = await sb.functions.invoke("send-sia-event", {
-          body: { alarm_type: "panic", parcel_name },
+          body: {
+            alarm_type: "panic",
+            parcel_name,
+            cra_user_number: device.cra_user_number || null,
+            source: "physical_button",
+          },
         });
         console.log(`[TraccarWH] send-sia-event [${parcel_name}]:`, JSON.stringify(siaRes.data));
       } catch (e: any) {
