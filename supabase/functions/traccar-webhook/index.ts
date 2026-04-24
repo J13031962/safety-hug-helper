@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
     }
 
     const sirenLabel = device.name || device.model || imei;
-    const senderName = `Botón físico GPS${deviceName ? ` (${deviceName})` : ""}`;
+    const senderName = `Botón físico${deviceName ? ` (${deviceName})` : ""}`;
     const observations = `Activado desde botón físico del GPS ${sirenLabel} (IMEI ${imei})`;
 
     const results: any[] = [];
