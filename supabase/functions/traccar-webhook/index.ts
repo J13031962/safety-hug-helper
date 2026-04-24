@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
     // Find the device by IMEI
     const { data: device, error: deviceErr } = await sb
       .from("gps_devices")
-      .select("id, imei, name, model, panic_button_enabled")
+      .select("id, imei, name, model, panic_button_enabled, cra_user_number")
       .eq("imei", imei)
       .maybeSingle();
 
