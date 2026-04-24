@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { alarm_type, parcel_name, phone_number } = await req.json();
+    const { alarm_type, parcel_name, phone_number, cra_user_number, source } = await req.json();
 
     if (!alarm_type || !parcel_name) {
       return new Response(
