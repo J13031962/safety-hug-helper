@@ -8,11 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Phone, Shield } from "lucide-react";
+import { Plus, Pencil, Trash2, Phone, Shield, AlertTriangle, Save } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 type RegisteredNumber = Tables<"registered_numbers">;
+type GpsDevice = Tables<"gps_devices">;
 
 interface Parcel {
   id: string;
@@ -20,7 +23,7 @@ interface Parcel {
   whatsapp_group_id: string | null;
 }
 
-interface GroupedNumber {
+interface GroupedUser {
   phone_number: string;
   owner_name: string;
   house_number: string | null;
@@ -30,10 +33,18 @@ interface GroupedNumber {
   is_parcel_admin: boolean;
 }
 
+interface PhysicalButton {
+  device: GpsDevice;
+  parcel_name: string;
+}
+
 export default function RegisteredNumbersTab() {
   const [numbers, setNumbers] = useState<RegisteredNumber[]>([]);
   const [parcels, setParcels] = useState<Parcel[]>([]);
+  const [devices, setDevices] = useState<GpsDevice[]>([]);
+  const [devicesParcels, setDevicesParcels] = useState<{ device_id: string; parcel_name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState<string | null>(null);
   const [form, setForm] = useState({ owner_name: "", phone_number: "", house_number: "", parcel_names: [] as string[], user_numbers: {} as Record<string, string>, is_parcel_admin: false });
@@ -44,14 +55,19 @@ export default function RegisteredNumbersTab() {
   const [renameTo, setRenameTo] = useState("");
   const [renaming, setRenaming] = useState(false);
 
+  // Local edits for cra_user_number per device
+  const [craEdits, setCraEdits] = useState<Record<string, string>>({});
+  const [savingCra, setSavingCra] = useState<string | null>(null);
+
   const uniqueParcels = useMemo(() => {
     const fromNumbers = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
     const fromParcelsTable = parcels.map((p) => p.name);
     return [...new Set([...fromNumbers, ...fromParcelsTable])].sort();
   }, [numbers, parcels]);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, GroupedNumber>();
+  // Group users by phone (one entry per person, with all their parcels)
+  const groupedUsers = useMemo(() => {
+    const map = new Map<string, GroupedUser>();
     for (const n of numbers) {
       const key = n.phone_number.replace(/\D/g, "");
       if (map.has(key)) {
@@ -75,14 +91,49 @@ export default function RegisteredNumbersTab() {
     return Array.from(map.values());
   }, [numbers]);
 
+  // Physical buttons enabled, by parcel
+  const physicalButtonsByParcel = useMemo(() => {
+    const map = new Map<string, PhysicalButton[]>();
+    const enabledDevices = devices.filter((d) => d.panic_button_enabled);
+    for (const dp of devicesParcels) {
+      const dev = enabledDevices.find((d) => d.id === dp.device_id);
+      if (!dev) continue;
+      if (!map.has(dp.parcel_name)) map.set(dp.parcel_name, []);
+      map.get(dp.parcel_name)!.push({ device: dev, parcel_name: dp.parcel_name });
+    }
+    return map;
+  }, [devices, devicesParcels]);
+
+  // Build per-parcel groups
+  const usersByParcel = useMemo(() => {
+    const map = new Map<string, GroupedUser[]>();
+    for (const u of groupedUsers) {
+      for (const p of u.parcels) {
+        if (!map.has(p)) map.set(p, []);
+        map.get(p)!.push(u);
+      }
+    }
+    return map;
+  }, [groupedUsers]);
+
   const fetchData = async () => {
     setLoading(true);
-    const [numbersRes, parcelsRes] = await Promise.all([
+    const [numbersRes, parcelsRes, devicesRes, dpRes] = await Promise.all([
       supabase.from("registered_numbers").select("*").order("created_at", { ascending: false }),
       supabase.from("parcels").select("id, name, whatsapp_group_id").order("name"),
+      supabase.from("gps_devices").select("*"),
+      supabase.from("gps_device_parcels").select("device_id, parcel_name"),
     ]);
     setNumbers(numbersRes.data || []);
     setParcels((parcelsRes.data as Parcel[]) || []);
+    setDevices(devicesRes.data || []);
+    setDevicesParcels(dpRes.data || []);
+    // seed CRA edits
+    const seed: Record<string, string> = {};
+    (devicesRes.data || []).forEach((d: any) => {
+      seed[d.id] = d.cra_user_number || "";
+    });
+    setCraEdits(seed);
     setLoading(false);
   };
 
@@ -94,7 +145,7 @@ export default function RegisteredNumbersTab() {
     setDialogOpen(true);
   };
 
-  const openEdit = (g: GroupedNumber) => {
+  const openEdit = (g: GroupedUser) => {
     setEditingPhone(g.phone_number.replace(/\D/g, ""));
     const userNums: Record<string, string> = {};
     for (const r of g.rows) {
@@ -135,7 +186,7 @@ export default function RegisteredNumbersTab() {
 
     try {
       if (editingPhone) {
-        const existing = grouped.find((g) => g.phone_number.replace(/\D/g, "") === editingPhone);
+        const existing = groupedUsers.find((g) => g.phone_number.replace(/\D/g, "") === editingPhone);
         if (existing) {
           for (const id of existing.ids) {
             await supabase.from("registered_numbers").delete().eq("id", id);
@@ -168,7 +219,7 @@ export default function RegisteredNumbersTab() {
     setSubmitting(false);
   };
 
-  const handleDelete = async (g: GroupedNumber) => {
+  const handleDelete = async (g: GroupedUser) => {
     if (!confirm(`¿Eliminar ${g.owner_name}?`)) return;
     for (const id of g.ids) {
       await supabase.from("registered_numbers").delete().eq("id", id);
@@ -197,6 +248,28 @@ export default function RegisteredNumbersTab() {
     setRenaming(false);
   };
 
+  const handleSaveCra = async (deviceId: string) => {
+    setSavingCra(deviceId);
+    const value = craEdits[deviceId]?.trim() || null;
+    const { error } = await supabase
+      .from("gps_devices")
+      .update({ cra_user_number: value })
+      .eq("id", deviceId);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Nº CRA actualizado" });
+      fetchData();
+    }
+    setSavingCra(null);
+  };
+
+  // List of parcels to render in accordion: union of (parcels with users) + (parcels with physical buttons)
+  const allParcels = useMemo(() => {
+    const set = new Set<string>([...usersByParcel.keys(), ...physicalButtonsByParcel.keys()]);
+    return Array.from(set).sort();
+  }, [usersByParcel, physicalButtonsByParcel]);
+
   return (
     <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-4">
@@ -213,54 +286,139 @@ export default function RegisteredNumbersTab() {
       <CardContent>
         {loading ? (
           <p className="text-muted-foreground text-sm animate-pulse">Cargando...</p>
+        ) : allParcels.length === 0 ? (
+          <p className="text-center text-muted-foreground text-sm py-8">No hay parcelaciones ni números registrados.</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Teléfono</TableHead>
-                <TableHead>Casa</TableHead>
-                <TableHead>Parcelaciones</TableHead>
-                <TableHead className="w-24">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {grouped.map((g) => (
-                <TableRow key={g.ids[0]}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      {g.owner_name}
-                      {g.is_parcel_admin && (
-                        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emergency-medical/20 text-emergency-medical font-medium">
-                          <Shield className="w-3 h-3" /> Admin
-                        </span>
+          <Accordion type="multiple" className="space-y-2">
+            {allParcels.map((parcel) => {
+              const users = usersByParcel.get(parcel) || [];
+              const buttons = physicalButtonsByParcel.get(parcel) || [];
+              const hasGroup = parcels.find((p) => p.name === parcel)?.whatsapp_group_id;
+              return (
+                <AccordionItem key={parcel} value={parcel} className="border border-border rounded-lg px-4">
+                  <AccordionTrigger className="hover:no-underline py-3">
+                    <div className="flex items-center gap-3 flex-1">
+                      <span className="font-display font-semibold text-base">{parcel}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {users.length} {users.length === 1 ? "persona" : "personas"}
+                      </Badge>
+                      {buttons.length > 0 && (
+                        <Badge className="text-xs bg-destructive/20 text-destructive hover:bg-destructive/30 border-destructive/30">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          {buttons.length} botón{buttons.length === 1 ? "" : "es"} físico{buttons.length === 1 ? "" : "s"}
+                        </Badge>
+                      )}
+                      {hasGroup && (
+                        <Badge variant="outline" className="text-xs">✅ Grupo WA</Badge>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell>{g.phone_number}</TableCell>
-                  <TableCell>{g.house_number || "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {g.parcels.length > 0 ? g.parcels.map((p) => (
-                        <span key={p} className="inline-block text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
-                          {p}
-                        </span>
-                      )) : <span className="text-xs text-muted-foreground">—</span>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEdit(g)}><Pencil className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(g)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {grouped.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No hay números registrados</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    {users.length > 0 && (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nombre</TableHead>
+                            <TableHead>Teléfono</TableHead>
+                            <TableHead>Casa</TableHead>
+                            <TableHead>Otras parcelaciones</TableHead>
+                            <TableHead className="w-24">Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {users.map((u) => {
+                            const otherParcels = u.parcels.filter((p) => p !== parcel);
+                            return (
+                              <TableRow key={`${parcel}-${u.ids[0]}`}>
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    {u.owner_name}
+                                    {u.is_parcel_admin && (
+                                      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emergency-medical/20 text-emergency-medical font-medium">
+                                        <Shield className="w-3 h-3" /> Admin
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>{u.phone_number}</TableCell>
+                                <TableCell>{u.house_number || "—"}</TableCell>
+                                <TableCell>
+                                  {otherParcels.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {otherParcels.map((p) => (
+                                        <span key={p} className="inline-block text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
+                                          {p}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex gap-1">
+                                    <Button variant="ghost" size="icon" onClick={() => openEdit(u)}><Pencil className="w-4 h-4" /></Button>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(u)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    )}
+                    {users.length === 0 && (
+                      <p className="text-xs text-muted-foreground py-2">No hay personas registradas en esta parcelación.</p>
+                    )}
+
+                    {buttons.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Botones físicos (sirenas)
+                        </div>
+                        {buttons.map(({ device }) => (
+                          <div
+                            key={`btn-${device.id}-${parcel}`}
+                            className="flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3"
+                          >
+                            <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">
+                                Botón físico — {device.name || device.model || device.imei}
+                              </div>
+                              <div className="text-xs text-muted-foreground font-mono truncate">
+                                IMEI: {device.imei}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Label className="text-xs whitespace-nowrap">Nº CRA:</Label>
+                              <Input
+                                value={craEdits[device.id] ?? ""}
+                                onChange={(e) =>
+                                  setCraEdits((prev) => ({ ...prev, [device.id]: e.target.value }))
+                                }
+                                placeholder="ej: 099"
+                                className="h-8 w-24 text-xs font-mono"
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleSaveCra(device.id)}
+                                disabled={savingCra === device.id || (craEdits[device.id] || "") === (device.cra_user_number || "")}
+                              >
+                                <Save className="w-3 h-3 mr-1" />
+                                {savingCra === device.id ? "..." : "Guardar"}
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
         )}
       </CardContent>
 
@@ -309,7 +467,6 @@ export default function RegisteredNumbersTab() {
               )}
             </div>
 
-            {/* Admin de parcelación toggle */}
             <div className="flex items-center justify-between rounded-lg border border-border p-3">
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium flex items-center gap-2">
