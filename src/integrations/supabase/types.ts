@@ -175,6 +175,35 @@ export type Database = {
         }
         Relationships: []
       }
+      operator_parcels: {
+        Row: {
+          created_at: string
+          id: string
+          parcel_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parcel_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parcel_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_parcels_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parcels: {
         Row: {
           account_number: string | null
@@ -292,6 +321,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      operator_parcel_names: { Args: { _user_id: string }; Returns: string[] }
       setup_first_admin: {
         Args: { _email: string; _full_name: string; _password: string }
         Returns: Json

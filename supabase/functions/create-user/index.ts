@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { email, password, full_name, role } = await req.json();
+    const { email, password, full_name, role, parcel_ids } = await req.json();
 
     // Create user
     const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -73,6 +73,13 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    }
+
+    // Assign operator parcels if provided
+    if (userData.user && Array.isArray(parcel_ids) && parcel_ids.length > 0) {
+      await supabaseAdmin
+        .from("operator_parcels")
+        .insert(parcel_ids.map((pid: string) => ({ user_id: userData.user!.id, parcel_id: pid })));
     }
 
     return new Response(JSON.stringify({ user: userData.user }), {
