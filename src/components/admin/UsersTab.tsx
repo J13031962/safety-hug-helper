@@ -39,6 +39,7 @@ export default function UsersTab() {
   const [submitting, setSubmitting] = useState(false);
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [selectedParcelIds, setSelectedParcelIds] = useState<string[]>([]);
+  const [parcelsLoading, setParcelsLoading] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -61,8 +62,10 @@ export default function UsersTab() {
 
   useEffect(() => {
     fetchUsers();
+    setParcelsLoading(true);
     supabase.from("parcels").select("id, name").order("name").then(({ data }) => {
       setParcels(data || []);
+      setParcelsLoading(false);
     });
   }, []);
 
@@ -78,16 +81,25 @@ export default function UsersTab() {
     setDialogOpen(true);
   };
 
+  const normalizeRole = (role: AppRole | null): AppRole => {
+    if (role === "admin" || role === "director_monitoreo" || role === "operator" || role === "supervisor_central") {
+      return role;
+    }
+
+    return "operator";
+  };
+
   const openEdit = (user: UserWithRole) => {
+    const normalizedRole = normalizeRole(user.role);
     setEditingUser(user);
     setForm({
       email: user.email || "",
       password: "",
       full_name: user.full_name || "",
-      role: user.role || "operator",
+      role: normalizedRole,
     });
     setSelectedParcelIds([]);
-    if (user.role === "operator") loadOperatorParcels(user.user_id);
+    loadOperatorParcels(user.user_id);
     setDialogOpen(true);
   };
 
@@ -226,19 +238,23 @@ export default function UsersTab() {
               </Select>
             </div>
 
-            {form.role === "operator" && (
-              <div className="space-y-2 pt-2 border-t border-border">
-                <Label>Parcelaciones asignadas</Label>
+            <div className="space-y-2 pt-2 border-t border-border">
+                <Label>Parcelación asignada</Label>
                 <p className="text-xs text-muted-foreground">
-                  El operador solo verá alarmas de las parcelaciones seleccionadas.
+                  {form.role === "operator"
+                    ? "El operador solo verá alarmas de las parcelaciones seleccionadas."
+                    : "Cambia el rol a Operador para asignar parcelaciones."}
                 </p>
                 <div className="max-h-48 overflow-y-auto border border-border rounded p-2 space-y-1.5">
-                  {parcels.length === 0 ? (
+                  {parcelsLoading ? (
+                    <p className="text-xs text-muted-foreground animate-pulse">Cargando parcelaciones...</p>
+                  ) : parcels.length === 0 ? (
                     <p className="text-xs text-muted-foreground">No hay parcelaciones registradas.</p>
                   ) : (
                     parcels.map((p) => (
-                      <label key={p.id} className="flex items-center gap-2 cursor-pointer text-sm py-1 px-1 hover:bg-muted/30 rounded">
+                      <label key={p.id} className="flex items-center gap-2 cursor-pointer text-sm py-1 px-1 hover:bg-muted/30 rounded data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50" data-disabled={form.role !== "operator"}>
                         <Checkbox
+                          disabled={form.role !== "operator"}
                           checked={selectedParcelIds.includes(p.id)}
                           onCheckedChange={() => toggleParcel(p.id)}
                         />
@@ -247,11 +263,10 @@ export default function UsersTab() {
                     ))
                   )}
                 </div>
-                {selectedParcelIds.length === 0 && (
+                {form.role === "operator" && selectedParcelIds.length === 0 && parcels.length > 0 && (
                   <p className="text-xs text-emergency-disaster">⚠ Sin parcelaciones, el operador no verá ninguna alarma.</p>
                 )}
               </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
