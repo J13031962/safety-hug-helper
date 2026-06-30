@@ -16,7 +16,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify caller is admin
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "No autorizado" }), {
@@ -47,9 +46,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { user_id, email, full_name, password, role } = await req.json();
+    const { user_id, email, full_name, password, role, parcel_ids } = await req.json();
 
-    // Update auth user
     const updateData: Record<string, any> = {};
     if (email) updateData.email = email;
     if (password) updateData.password = password;
@@ -65,7 +63,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update profile
     if (full_name || email) {
       const profileUpdate: Record<string, string> = {};
       if (full_name) profileUpdate.full_name = full_name;
@@ -73,17 +70,26 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from("profiles").update(profileUpdate).eq("user_id", user_id);
     }
 
-    // Update role
     if (role) {
       await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
       await supabaseAdmin.from("user_roles").insert({ user_id, role });
+    }
+
+    // Sync operator parcels assignments
+    if (Array.isArray(parcel_ids)) {
+      await supabaseAdmin.from("operator_parcels").delete().eq("user_id", user_id);
+      if (parcel_ids.length > 0) {
+        await supabaseAdmin
+          .from("operator_parcels")
+          .insert(parcel_ids.map((pid: string) => ({ user_id, parcel_id: pid })));
+      }
     }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
