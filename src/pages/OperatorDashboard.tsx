@@ -47,6 +47,15 @@ export default function OperatorDashboard() {
     }
   }, [loading, user, role, navigate]);
 
+  // Request browser notification permission once
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    }
+  }, []);
+
   // Fetch operator profiles
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -84,11 +93,28 @@ export default function OperatorDashboard() {
             fire: "¡Alerta de incendio!",
             disaster: "¡Alerta de desastre!",
           };
+          const typeName = (typeConfig[newAlarm.alarm_type]?.label) || "ALERTA";
+          // Web notification (works even with tab in background)
+          try {
+            if ("Notification" in window && Notification.permission === "granted") {
+              const body = [
+                newAlarm.sender_name ? `De: ${newAlarm.sender_name}` : null,
+                newAlarm.parcel_name ? `Parcela: ${newAlarm.parcel_name}` : null,
+                newAlarm.house_number ? `Casa: ${newAlarm.house_number}` : null,
+              ].filter(Boolean).join(" · ");
+              const n = new Notification(`🚨 Nueva alerta: ${typeName}`, {
+                body: body || "Nueva alarma recibida",
+                tag: newAlarm.id,
+                requireInteraction: true,
+                icon: "/favicon.ico",
+              });
+              n.onclick = () => { window.focus(); n.close(); };
+            }
+          } catch {}
           try {
             const siren = new Audio("/sounds/police-siren.mp3");
             siren.volume = 1;
             siren.play().catch(() => {});
-            // After 4s speak the alert type
             setTimeout(() => {
               siren.pause();
               const msg = new SpeechSynthesisUtterance(voiceLabels[newAlarm.alarm_type] || "¡Nueva alerta!");

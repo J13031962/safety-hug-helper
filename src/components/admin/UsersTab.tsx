@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Users } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
@@ -19,6 +20,8 @@ interface UserWithRole {
   full_name: string | null;
   role: AppRole | null;
 }
+
+interface Parcel { id: string; name: string }
 
 const roleLabels: Record<AppRole, string> = {
   admin: "Administrador",
@@ -34,6 +37,8 @@ export default function UsersTab() {
   const [editingUser, setEditingUser] = useState<UserWithRole | null>(null);
   const [form, setForm] = useState({ email: "", password: "", full_name: "", role: "operator" as AppRole });
   const [submitting, setSubmitting] = useState(false);
+  const [parcels, setParcels] = useState<Parcel[]>([]);
+  const [selectedParcelIds, setSelectedParcelIds] = useState<string[]>([]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -54,11 +59,22 @@ export default function UsersTab() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    fetchUsers();
+    supabase.from("parcels").select("id, name").order("name").then(({ data }) => {
+      setParcels(data || []);
+    });
+  }, []);
+
+  const loadOperatorParcels = async (userId: string) => {
+    const { data } = await supabase.from("operator_parcels").select("parcel_id").eq("user_id", userId);
+    setSelectedParcelIds((data || []).map((r: any) => r.parcel_id));
+  };
 
   const openCreate = () => {
     setEditingUser(null);
     setForm({ email: "", password: "", full_name: "", role: "operator" });
+    setSelectedParcelIds([]);
     setDialogOpen(true);
   };
 
@@ -70,14 +86,21 @@ export default function UsersTab() {
       full_name: user.full_name || "",
       role: user.role || "operator",
     });
+    setSelectedParcelIds([]);
+    if (user.role === "operator") loadOperatorParcels(user.user_id);
     setDialogOpen(true);
+  };
+
+  const toggleParcel = (id: string) => {
+    setSelectedParcelIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   };
 
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
+      const parcel_ids = form.role === "operator" ? selectedParcelIds : [];
       if (editingUser) {
-        const body: Record<string, any> = { user_id: editingUser.user_id, full_name: form.full_name, role: form.role };
+        const body: Record<string, any> = { user_id: editingUser.user_id, full_name: form.full_name, role: form.role, parcel_ids };
         if (form.email !== editingUser.email) body.email = form.email;
         if (form.password) body.password = form.password;
 
@@ -92,7 +115,7 @@ export default function UsersTab() {
           return;
         }
         const { data, error } = await supabase.functions.invoke("create-user", {
-          body: { email: form.email, password: form.password, full_name: form.full_name, role: form.role },
+          body: { email: form.email, password: form.password, full_name: form.full_name, role: form.role, parcel_ids },
         });
         if (error) throw error;
         if (data?.error) throw new Error(data.error);
@@ -173,7 +196,7 @@ export default function UsersTab() {
       </CardContent>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md border-border">
+        <DialogContent className="sm:max-w-md border-border max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display">{editingUser ? "Editar usuario" : "Nuevo usuario"}</DialogTitle>
           </DialogHeader>
@@ -202,6 +225,33 @@ export default function UsersTab() {
                 </SelectContent>
               </Select>
             </div>
+
+            {form.role === "operator" && (
+              <div className="space-y-2 pt-2 border-t border-border">
+                <Label>Parcelaciones asignadas</Label>
+                <p className="text-xs text-muted-foreground">
+                  El operador solo verá alarmas de las parcelaciones seleccionadas.
+                </p>
+                <div className="max-h-48 overflow-y-auto border border-border rounded p-2 space-y-1.5">
+                  {parcels.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No hay parcelaciones registradas.</p>
+                  ) : (
+                    parcels.map((p) => (
+                      <label key={p.id} className="flex items-center gap-2 cursor-pointer text-sm py-1 px-1 hover:bg-muted/30 rounded">
+                        <Checkbox
+                          checked={selectedParcelIds.includes(p.id)}
+                          onCheckedChange={() => toggleParcel(p.id)}
+                        />
+                        <span>{p.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                {selectedParcelIds.length === 0 && (
+                  <p className="text-xs text-emergency-disaster">⚠ Sin parcelaciones, el operador no verá ninguna alarma.</p>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
