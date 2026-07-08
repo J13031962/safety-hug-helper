@@ -37,82 +37,128 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
 
   const fetchSirens = async () => {
     setLoading(true);
-    // Get device_ids for user's parcels
-    const { data: dpData } = await supabase
-      .from("gps_device_parcels")
-      .select("device_id, parcel_name")
-      .in("parcel_name", userParcels);
+    try {
+      if (!userParcels || userParcels.length === 0) {
+        console.info("[TestSiren] fetchSirens: sin parcelaciones asignadas");
+        setSirens([]);
+        setLoading(false);
+        return;
+      }
 
-    if (!dpData || dpData.length === 0) {
+      const { data: dpData, error: dpErr } = await supabase
+        .from("gps_device_parcels")
+        .select("device_id, parcel_name")
+        .in("parcel_name", userParcels);
+
+      if (dpErr) console.warn("[TestSiren] gps_device_parcels error:", dpErr);
+
+      if (!dpData || dpData.length === 0) {
+        setSirens([]);
+        setLoading(false);
+        return;
+      }
+
+      const deviceIds = [...new Set(dpData.map((dp) => dp.device_id))];
+      const { data: devices, error: devErr } = await supabase
+        .from("gps_devices")
+        .select("id, imei, model, relay_duration, name")
+        .in("id", deviceIds);
+
+      if (devErr) console.warn("[TestSiren] gps_devices error:", devErr);
+
+      const mapped: SirenDevice[] = (devices || []).map((d) => ({
+        ...d,
+        parcel_names: dpData
+          .filter((dp) => dp.device_id === d.id)
+          .map((dp) => dp.parcel_name),
+      }));
+
+      console.info("[TestSiren] sirenas cargadas:", mapped.length);
+      setSirens(mapped);
+    } catch (err) {
+      console.error("[TestSiren] fetchSirens crash:", err);
       setSirens([]);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const deviceIds = [...new Set(dpData.map((dp) => dp.device_id))];
-    const { data: devices } = await supabase
-      .from("gps_devices")
-      .select("id, imei, model, relay_duration, name")
-      .in("id", deviceIds);
-
-    const mapped: SirenDevice[] = (devices || []).map((d) => ({
-      ...d,
-      parcel_names: dpData.filter((dp) => dp.device_id === d.id).map((dp) => dp.parcel_name),
-    }));
-
-    setSirens(mapped);
-    setLoading(false);
   };
 
   const handleActivate = async (siren: SirenDevice) => {
     setActivating(siren.id);
-    try {
-      // Activate physical siren via GPS command
-      const { error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
-        body: { imei: siren.imei, action: "engineStop", mode: "test" },
-      });
+    const displayName = siren.name || siren.model || siren.imei;
+    console.info("[TestSiren] activar:", displayName, siren);
 
-      if (gpsErr) {
-        console.warn("[Test] GPS error:", gpsErr);
+    try {
+      try {
+        const { error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
+          body: { imei: siren.imei, action: "engineStop", mode: "test" },
+        });
+        if (gpsErr) console.warn("[TestSiren] GPS error:", gpsErr);
+      } catch (e) {
+        console.warn("[TestSiren] GPS invoke crash:", e);
       }
 
-      // Send SIA OP event and WhatsApp notification for each parcel
-      const displayName = siren.name || siren.model || siren.imei;
-      for (const parcel of siren.parcel_names) {
-        await supabase.functions.invoke("send-sia-event", {
-          body: { alarm_type: "test", parcel_name: parcel },
-        });
+      const parcels = Array.isArray(siren.parcel_names) ? siren.parcel_names.filter(Boolean) : [];
+      if (parcels.length === 0) {
+        console.warn("[TestSiren] sirena sin parcelaciones asociadas");
+      }
 
-        // Send WhatsApp notification
-        await supabase.functions.invoke("send-whatsapp", {
-          body: {
+      for (const parcel of parcels) {
+        try {
+          await supabase.functions.invoke("send-sia-event", {
+            body: { alarm_type: "test", parcel_name: parcel },
+          });
+        } catch (e) {
+          console.warn("[TestSiren] SIA invoke error:", parcel, e);
+        }
+
+        try {
+          await supabase.functions.invoke("send-whatsapp", {
+            body: {
+              alarm_type: "test",
+              sender_name: userName || "Admin",
+              parcel_name: parcel,
+              siren_name: displayName,
+            },
+          });
+        } catch (e) {
+          console.warn("[TestSiren] WhatsApp invoke error:", parcel, e);
+        }
+      }
+
+      for (const parcel of parcels) {
+        try {
+          const { error: insErr } = await supabase.from("alarms").insert({
             alarm_type: "test",
             sender_name: userName || "Admin",
             parcel_name: parcel,
-            siren_name: displayName,
-          },
-        });
-      }
-
-      // Register test alarm for each parcel
-      for (const parcel of siren.parcel_names) {
-        await supabase.from("alarms").insert({
-          alarm_type: "test",
-          sender_name: userName || "Admin",
-          parcel_name: parcel,
-          status: "resolved",
-          observations: `Prueba de sirena: ${displayName}`,
-        });
+            status: "resolved",
+            observations: `Prueba de sirena: ${displayName}`,
+          });
+          if (insErr) console.warn("[TestSiren] insert alarm error:", parcel, insErr);
+        } catch (e) {
+          console.warn("[TestSiren] insert alarm crash:", parcel, e);
+        }
       }
 
       setResults((r) => ({ ...r, [siren.id]: "success" }));
-      toast({ title: "Sirena activada", description: `${displayName} — se apagará en ${siren.relay_duration}s` });
-    } catch {
+      toast({
+        title: "Sirena activada",
+        description: `${displayName} — se apagará en ${siren.relay_duration}s`,
+      });
+    } catch (err) {
+      console.error("[TestSiren] handleActivate crash:", err);
       setResults((r) => ({ ...r, [siren.id]: "error" }));
-      toast({ title: "Error", description: "No se pudo activar la sirena", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "No se pudo activar la sirena",
+        variant: "destructive",
+      });
+    } finally {
+      setActivating(null);
     }
-    setActivating(null);
   };
+
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
