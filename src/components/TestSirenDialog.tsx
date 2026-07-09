@@ -88,32 +88,46 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
     const displayName = siren.name || siren.model || siren.imei;
     console.info("[TestSiren] activar:", displayName, siren);
 
+    const parcels = Array.isArray(siren.parcel_names) ? siren.parcel_names.filter(Boolean) : [];
+    const primaryParcel = parcels[0];
+
     let gpsSuccess = false;
     let gpsFailReason: string | null = null;
     try {
-      try {
-        console.info("[TestSiren] invocando send-gps-command para IMEI:", siren.imei);
-        const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
-          body: { imei: siren.imei, action: "engineStop", mode: "test" },
-        });
-        console.info("[TestSiren] respuesta send-gps-command:", { data: gpsData, error: gpsErr });
-        if (gpsErr) {
-          gpsFailReason = gpsErr.message || "error de red";
-          console.warn("[TestSiren] GPS error:", gpsErr);
-        } else if (gpsData && gpsData.success === false) {
-          gpsFailReason = gpsData.reason || gpsData.error || "fallo desconocido";
-          console.warn("[TestSiren] GPS respondió success=false:", gpsData);
-        } else {
-          gpsSuccess = true;
-        }
-      } catch (e: any) {
-        gpsFailReason = e?.message || "excepción";
-        console.warn("[TestSiren] GPS invoke crash:", e);
-      }
-
-      const parcels = Array.isArray(siren.parcel_names) ? siren.parcel_names.filter(Boolean) : [];
-      if (parcels.length === 0) {
+      if (!primaryParcel) {
+        gpsFailReason = "La sirena no tiene parcelación asociada";
         console.warn("[TestSiren] sirena sin parcelaciones asociadas");
+      } else {
+        try {
+          console.info("[TestSiren] invocando send-gps-command por parcela:", {
+            imei: siren.imei,
+            parcel_name: primaryParcel,
+          });
+          const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
+            body: {
+              alarm_type: "test",
+              parcel_name: primaryParcel,
+              imei: siren.imei,
+              mode: "test",
+            },
+          });
+          console.info("[TestSiren] respuesta send-gps-command:", { data: gpsData, error: gpsErr });
+          if (gpsErr) {
+            gpsFailReason = gpsErr.message || "error de red";
+            console.warn("[TestSiren] GPS error:", gpsErr);
+          } else if (gpsData && gpsData.success === false) {
+            gpsFailReason = gpsData.reason || gpsData.error || gpsData.message || "fallo desconocido";
+            console.warn("[TestSiren] GPS respondió success=false:", gpsData);
+          } else if (gpsData?.results?.length && !gpsData.results.some((r: any) => r.success)) {
+            gpsFailReason = gpsData.results.map((r: any) => r.error).filter(Boolean).join(" | ") || "ningún dispositivo respondió";
+            console.warn("[TestSiren] GPS sin resultados exitosos:", gpsData);
+          } else {
+            gpsSuccess = true;
+          }
+        } catch (e: any) {
+          gpsFailReason = e?.message || "excepción";
+          console.warn("[TestSiren] GPS invoke crash:", e);
+        }
       }
 
       for (const parcel of parcels) {
