@@ -199,17 +199,41 @@ Deno.serve(async (req) => {
 
     // Direct command mode (action + imei) or test mode
     if (action && imei) {
+      console.log(`[GPS-TEST] request: imei=${imei}, action=${action}, mode=${mode ?? "direct"}`);
       const deviceId = await findDeviceId(cookie, imei);
       if (!deviceId) {
-        return new Response(JSON.stringify({ success: false, error: `Device ${imei} not found in Traccar` }), {
+        console.warn(`[GPS-TEST] IMEI ${imei} NOT found in Traccar`);
+        return new Response(JSON.stringify({ success: false, reason: "device_not_found", error: `Device ${imei} not found in Traccar` }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      console.log(`[GPS-TEST] traccar deviceId=${deviceId} for IMEI=${imei}`);
+
+      // In test mode, cancel any pending engineResume for this IMEI BEFORE sending engineStop.
+      // Otherwise a stale relay-off job (RELAY,0#) could fire seconds later and cut the siren short.
+      if (mode === "test" && action === "engineStop") {
+        const supabaseEarly = getSupabase();
+        const { data: cancelled, error: cancelErr } = await supabaseEarly
+          .from("gps_relay_jobs")
+          .update({
+            status: "cancelled",
+            completed_at: new Date().toISOString(),
+            error_message: "Reemplazado por prueba de sirena",
+          })
+          .eq("imei", imei)
+          .eq("action", "engineResume")
+          .in("status", ["pending", "processing"])
+          .select("id");
+        if (cancelErr) console.warn(`[GPS-TEST] cancel prev jobs error:`, cancelErr.message);
+        else console.log(`[GPS-TEST] cancelled ${cancelled?.length ?? 0} pending engineResume jobs for ${imei}`);
+      }
 
       const result = await sendDeviceCommand(cookie, deviceId, action as DeviceAction);
+      console.log(`[GPS-TEST] engineStop success=${result.success} attempts=${result.attempts.map(a => `${a.name}:${a.status}`).join(",")}`);
 
       // In test mode, also schedule auto-off
+      let scheduledDuration: number | null = null;
       if (mode === "test" && action === "engineStop" && result.success) {
         const supabase = getSupabase();
         const { data: device } = await supabase
@@ -217,24 +241,35 @@ Deno.serve(async (req) => {
           .select("relay_duration")
           .eq("imei", imei)
           .maybeSingle();
-        
+
         const duration = device?.relay_duration ?? 30;
+        scheduledDuration = duration;
         const executeAt = new Date(Date.now() + duration * 1000);
 
         await supabase.from("gps_devices")
           .update({ relay_active_until: executeAt.toISOString() })
           .eq("imei", imei);
 
-        await supabase.from("gps_relay_jobs").insert({
+        const { error: jobErr } = await supabase.from("gps_relay_jobs").insert({
           imei,
           device_id_traccar: deviceId,
           action: "engineResume",
           status: "pending",
           execute_at: executeAt.toISOString(),
         });
+        if (jobErr) console.warn(`[GPS-TEST] insert engineResume job error:`, jobErr.message);
+        else console.log(`[GPS-TEST] scheduled engineResume at ${executeAt.toISOString()} (in ${duration}s)`);
       }
 
-      return new Response(JSON.stringify(result), {
+      return new Response(JSON.stringify({
+        success: result.success,
+        imei,
+        deviceId,
+        mode: mode ?? "direct",
+        duration: scheduledDuration,
+        error: result.success ? undefined : result.error,
+        attempts: result.attempts,
+      }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
