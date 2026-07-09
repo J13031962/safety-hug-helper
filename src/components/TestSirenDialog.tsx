@@ -88,13 +88,26 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
     const displayName = siren.name || siren.model || siren.imei;
     console.info("[TestSiren] activar:", displayName, siren);
 
+    let gpsSuccess = false;
+    let gpsFailReason: string | null = null;
     try {
       try {
-        const { error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
+        console.info("[TestSiren] invocando send-gps-command para IMEI:", siren.imei);
+        const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
           body: { imei: siren.imei, action: "engineStop", mode: "test" },
         });
-        if (gpsErr) console.warn("[TestSiren] GPS error:", gpsErr);
-      } catch (e) {
+        console.info("[TestSiren] respuesta send-gps-command:", { data: gpsData, error: gpsErr });
+        if (gpsErr) {
+          gpsFailReason = gpsErr.message || "error de red";
+          console.warn("[TestSiren] GPS error:", gpsErr);
+        } else if (gpsData && gpsData.success === false) {
+          gpsFailReason = gpsData.reason || gpsData.error || "fallo desconocido";
+          console.warn("[TestSiren] GPS respondió success=false:", gpsData);
+        } else {
+          gpsSuccess = true;
+        }
+      } catch (e: any) {
+        gpsFailReason = e?.message || "excepción";
         console.warn("[TestSiren] GPS invoke crash:", e);
       }
 
@@ -141,11 +154,20 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
         }
       }
 
-      setResults((r) => ({ ...r, [siren.id]: "success" }));
-      toast({
-        title: "Sirena activada",
-        description: `${displayName} — se apagará en ${siren.relay_duration}s`,
-      });
+      if (gpsSuccess) {
+        setResults((r) => ({ ...r, [siren.id]: "success" }));
+        toast({
+          title: "Sirena activada",
+          description: `${displayName} — se apagará en ${siren.relay_duration}s`,
+        });
+      } else {
+        setResults((r) => ({ ...r, [siren.id]: "error" }));
+        toast({
+          title: "No se pudo activar la sirena",
+          description: gpsFailReason || "Revisa la conexión del dispositivo",
+          variant: "destructive",
+        });
+      }
     } catch (err) {
       console.error("[TestSiren] handleActivate crash:", err);
       setResults((r) => ({ ...r, [siren.id]: "error" }));
