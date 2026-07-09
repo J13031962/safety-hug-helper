@@ -197,8 +197,9 @@ Deno.serve(async (req) => {
 
     const cookie = await traccarLogin();
 
-    // Direct command mode (action + imei) or test mode
-    if (action && imei) {
+    // Direct command mode (action + imei). Test siren requests with alarm_type must use
+    // the same parcel-based relay path as real alarms so relay scheduling/cancellation matches.
+    if (action && imei && !alarm_type) {
       console.log(`[GPS-TEST] request: imei=${imei}, action=${action}, mode=${mode ?? "direct"}`);
       const deviceId = await findDeviceId(cookie, imei);
       if (!deviceId) {
@@ -295,6 +296,9 @@ Deno.serve(async (req) => {
     const clientParcel = normalizeParcel(body.parcel_name || alarmParcel || "");
 
     console.log(`[GPS] Alarm triggered. phone="${senderPhone}", client_parcel="${clientParcel}", type="${alarm_type}"`);
+    if (alarm_type === "test") {
+      console.log(`[GPS] test parcel=${clientParcel || "unresolved"} imei_hint=${imei || "none"}`);
+    }
 
     let resolvedParcel: string | null = null;
 
