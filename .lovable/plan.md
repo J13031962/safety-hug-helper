@@ -1,28 +1,31 @@
 ## Diagnóstico
 
-La prueba sí llegó al backend para el IMEI `355468593809965` y encontró el equipo en Traccar como `deviceId=4`, pero el modo de prueba está usando una rama directa (`action + imei`) distinta al flujo de alarma real. Como las alarmas reales sí suenan, la corrección más segura es hacer que “Prueba de Sirenas” reutilice el mismo flujo por parcela que usan los botones de pánico/alarma, en vez de una ruta GPS especial.
+El botón sí está llamando a `send-gps-command` y el backend responde `success: true`, pero el flujo del botón ahora envía también eventos/registro con `alarm_type: "test"`. El registro en `alarms` está fallando por la restricción de tipos de alarma, y lo más importante: la prueba manual que sonó fue una llamada directa controlada al backend, mientras que el botón usa el flujo de parcela y no fuerza una ejecución exclusiva para el IMEI seleccionado.
 
-## Plan de implementación
+## Plan
 
-1. **Cambiar la activación de prueba en `TestSirenDialog.tsx`**
-   - Enviar a `send-gps-command` el `alarm_type: "test"` y `parcel_name` de la sirena, igual que una alarma real.
-   - Mantener `imei` como dato de diagnóstico opcional, pero no depender de la rama directa `action + imei` para activar el relé.
-   - Solo mostrar “Sirena activada” si el backend confirma que al menos un dispositivo respondió correctamente.
+1. **Frontend: hacer que el botón use el modo directo comprobado**
+   - En `TestSirenDialog.tsx`, cambiar la activación para enviar al backend:
+     - `action: "engineStop"`
+     - `imei: siren.imei`
+     - `mode: "test"`
+   - Esto usará exactamente la rama de prueba directa que ya tiene cancelación de apagados pendientes y programación automática de `engineResume`.
 
-2. **Ajustar `send-gps-command/index.ts`**
-   - Para `alarm_type: "test"`, resolver dispositivos por `parcel_name`, igual que pánico/médica/fuego/desastre.
-   - Evitar que el modo test entre primero por la rama directa `action + imei` cuando se necesita el comportamiento real de relé.
-   - Registrar en logs algo claro como `[GPS] test parcel=Casa Vieja imei=...` y los intentos de comando.
+2. **Evitar que tareas no críticas interfieran con la sirena**
+   - Ejecutar primero GPS/relé.
+   - Solo después, y sin bloquear el resultado de la sirena, intentar WhatsApp/SIA si corresponde.
+   - No mostrar “Sirena activada” por WhatsApp/SIA ni por inserciones en historial; solo por confirmación del comando GPS.
 
-3. **Mantener el apagado automático**
-   - Conservar la creación del trabajo `engineResume` para apagar la sirena después de `relay_duration`.
-   - Mantener la cancelación de trabajos antiguos para evitar que una orden vieja apague la sirena inmediatamente.
+3. **Corregir el error de historial de pruebas**
+   - Dejar de insertar `alarm_type: "test"` en `alarms`, porque la base de datos no lo permite.
+   - Omitir ese insert para pruebas de sirena o registrarlo como observación en un tipo permitido si ya existe un patrón del proyecto. Para minimizar riesgo, lo omitiré.
 
-4. **No tocar otros flujos**
-   - No cambiar WhatsApp, SIA ni las alarmas reales.
-   - No cambiar base de datos ni permisos.
+4. **Backend: mantener y reforzar el modo directo de prueba**
+   - Mantener la rama `action + imei + mode: "test"` en `send-gps-command`.
+   - Asegurar que, al activar prueba, cancele apagados pendientes, envíe `engineStop`, actualice `relay_active_until` y programe `engineResume`.
+   - Retornar un error claro si ningún intento válido fue aceptado.
 
-5. **Verificación**
-   - Desplegar la función backend modificada.
-   - Revisar logs de `send-gps-command` para confirmar que la prueba de Casa Vieja ejecuta el mismo bloque que una alarma real y apunta al IMEI `355468593809965`.
-   - Validar que la respuesta indique éxito solo si el relé recibió comando aceptado.
+5. **Validación**
+   - Desplegar la función `send-gps-command` si cambia.
+   - Probar una llamada directa con el IMEI `355468593809965` igual que lo hará el botón.
+   - Confirmar en logs que sale `[GPS-TEST] request` y que se envía `engineStop` para ese IMEI.
