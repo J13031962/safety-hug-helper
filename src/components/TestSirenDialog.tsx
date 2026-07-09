@@ -154,11 +154,20 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
         }
       }
 
-      setResults((r) => ({ ...r, [siren.id]: "success" }));
-      toast({
-        title: "Sirena activada",
-        description: `${displayName} — se apagará en ${siren.relay_duration}s`,
-      });
+      if (gpsSuccess) {
+        setResults((r) => ({ ...r, [siren.id]: "success" }));
+        toast({
+          title: "Sirena activada",
+          description: `${displayName} — se apagará en ${siren.relay_duration}s`,
+        });
+      } else {
+        setResults((r) => ({ ...r, [siren.id]: "error" }));
+        toast({
+          title: "No se pudo activar la sirena",
+          description: gpsFailReason || "Revisa la conexión del dispositivo",
+          variant: "destructive",
+        });
+      }
     } catch (err) {
       console.error("[TestSiren] handleActivate crash:", err);
       setResults((r) => ({ ...r, [siren.id]: "error" }));
