@@ -74,7 +74,7 @@ function generatePDF(title: string, headers: string[], rows: string[][], dateRan
 }
 
 const typeLabels: Record<string, string> = {
-  panic: "Pánico", medical: "Médica", fire: "Incendio", disaster: "Desastre",
+  panic: "Pánico", medical: "Médica", fire: "Incendio", disaster: "Desastre", domestic: "Violencia Intrafamiliar",
 };
 const statusLabels: Record<string, string> = {
   pending: "Pendiente", processing: "En proceso", resolved: "Resuelta",

@@ -13,6 +13,7 @@ const typeLabels: Record<string, { label: string; color: string }> = {
   medical: { label: "Médica", color: "bg-emergency-medical" },
   fire: { label: "Incendio", color: "bg-emergency-fire" },
   disaster: { label: "Desastre", color: "bg-emergency-disaster" },
+  domestic: { label: "Violencia Intrafamiliar", color: "bg-emergency-domestic" },
   test: { label: "Prueba", color: "bg-muted" },
 };
 
