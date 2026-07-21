@@ -22,6 +22,7 @@ const typeConfig: Record<string, { label: string; emoji: string; color: string; 
   medical: { label: "MÉDICA", emoji: "🏥", color: "bg-emergency-medical", border: "border-emergency-medical/40" },
   fire: { label: "INCENDIO", emoji: "🔥", color: "bg-emergency-fire", border: "border-emergency-fire/40" },
   disaster: { label: "DESASTRE", emoji: "⚠️", color: "bg-emergency-disaster", border: "border-emergency-disaster/40" },
+  domestic: { label: "VIOLENCIA INTRAFAMILIAR", emoji: "🟢", color: "bg-emergency-domestic", border: "border-emergency-domestic/40" },
   test: { label: "PRUEBA", emoji: "🔔", color: "bg-muted", border: "border-muted-foreground/40" },
 };
 
@@ -92,6 +93,7 @@ export default function OperatorDashboard() {
             medical: "¡Alerta médica!",
             fire: "¡Alerta de incendio!",
             disaster: "¡Alerta de desastre!",
+            domestic: "¡Alerta de violencia intrafamiliar!",
           };
           const typeName = (typeConfig[newAlarm.alarm_type]?.label) || "ALERTA";
           // Web notification (works even with tab in background)

@@ -1,31 +1,44 @@
-## Diagnóstico
+## Cambios solicitados
 
-El botón sí está llamando a `send-gps-command` y el backend responde `success: true`, pero el flujo del botón ahora envía también eventos/registro con `alarm_type: "test"`. El registro en `alarms` está fallando por la restricción de tipos de alarma, y lo más importante: la prueba manual que sonó fue una llamada directa controlada al backend, mientras que el botón usa el flujo de parcela y no fuerza una ejecución exclusiva para el IMEI seleccionado.
+### 1. Código SIA de "Prueba de Sirenas": OP → TA
+- En `supabase/functions/send-sia-event/index.ts`:
+  - Cambiar `test: "OP"` por `test: "TA"` en `EVENT_CODES`.
+  - Quitar la excepción que envía las pruebas **sin zona**. TA lleva zona (default `001`), mensaje: `"SIA-DCS"0001L0#9999[#9999|TA001]_`.
 
-## Plan
+### 2. Nuevo botón "VIOLENCIA INTRAFAMILIAR" (código HA)
 
-1. **Frontend: hacer que el botón use el modo directo comprobado**
-   - En `TestSirenDialog.tsx`, cambiar la activación para enviar al backend:
-     - `action: "engineStop"`
-     - `imei: siren.imei`
-     - `mode: "test"`
-   - Esto usará exactamente la rama de prueba directa que ya tiene cancelación de apagados pendientes y programación automática de `engineResume`.
+Nuevo tipo interno `domestic`, color verde, código SIA `HA` con zona → `HA001`.
 
-2. **Evitar que tareas no críticas interfieran con la sirena**
-   - Ejecutar primero GPS/relé.
-   - Solo después, y sin bloquear el resultado de la sirena, intentar WhatsApp/SIA si corresponde.
-   - No mostrar “Sirena activada” por WhatsApp/SIA ni por inserciones en historial; solo por confirmación del comando GPS.
+**Frontend:**
+- `src/components/EmergencyGrid.tsx`:
+  - Añadir `"domestic"` al tipo `AlarmType`.
+  - Añadir 5º botón verde con ícono adecuado (`HeartHandshake` o `Users`), mismas dimensiones que los otros 4.
+  - Layout: mantener grid 2×2 y añadir el nuevo debajo, centrado entre las columnas de Incendio y Desastre (contenedor con `flex justify-center`, mismo `aspect-ratio` y ancho equivalente a una celda):
+    ```text
+    [ PÁNICO ]   [ MÉDICA  ]
+    [ INCENDIO ] [ DESASTRE ]
+          [ VIOLENCIA ]
+    ```
+- `src/pages/Index.tsx`: ampliar `AlarmType` con `"domestic"`. El botón "PRUEBA DE SIRENAS" queda debajo, sin cambios.
+- `src/components/ConfirmDialog.tsx`: añadir textos/estilos para `domestic` (título, mensaje, color verde), reutilizando la lógica existente.
+- `tailwind.config.ts` / `src/index.css`: añadir token semántico `emergency-domestic` (verde) y clase `bg-emergency-domestic`, coherente con la paleta.
 
-3. **Corregir el error de historial de pruebas**
-   - Dejar de insertar `alarm_type: "test"` en `alarms`, porque la base de datos no lo permite.
-   - Omitir ese insert para pruebas de sirena o registrarlo como observación en un tipo permitido si ya existe un patrón del proyecto. Para minimizar riesgo, lo omitiré.
+**Backend:**
+- `supabase/functions/send-sia-event/index.ts`: añadir `domestic: "HA"` en `EVENT_CODES` (se envía con zona normal, misma lógica que PA/MA/FA/BA).
+- `supabase/functions/send-whatsapp/index.ts` y demás mapeos de `alarm_type` a etiqueta legible (dashboard operador, historial): añadir "Violencia Intrafamiliar" para `domestic`.
+- Verificar el CHECK/enum de `alarms.alarm_type`. Si restringe a los 4 valores actuales, crear migración para incluir `'domestic'` y mantener registro histórico.
 
-4. **Backend: mantener y reforzar el modo directo de prueba**
-   - Mantener la rama `action + imei + mode: "test"` en `send-gps-command`.
-   - Asegurar que, al activar prueba, cancele apagados pendientes, envíe `engineStop`, actualice `relay_active_until` y programe `engineResume`.
-   - Retornar un error claro si ningún intento válido fue aceptado.
+### 3. Validación
+- **Las pruebas se harán ÚNICAMENTE con la parcela "Teleguardia" (cuenta 9999)** para no molestar a Casa Vieja ni Casa Juan Vásquez.
+- Enviar prueba de sirenas y confirmar en logs de `send-sia-event`: `..."SIA-DCS"0001L0#9999[#9999|TA001]_`.
+- Pulsar el nuevo botón Violencia Intrafamiliar sobre Teleguardia y confirmar: `...|HA001]_`, llegada a WhatsApp e inserción en `alarms`.
+- Verificar visualmente en móvil que el 5º botón queda centrado bajo Incendio/Desastre y "PRUEBA DE SIRENAS" permanece debajo.
 
-5. **Validación**
-   - Desplegar la función `send-gps-command` si cambia.
-   - Probar una llamada directa con el IMEI `355468593809965` igual que lo hará el botón.
-   - Confirmar en logs que sale `[GPS-TEST] request` y que se envía `engineStop` para ese IMEI.
+### Archivos a tocar
+- `src/components/EmergencyGrid.tsx`
+- `src/pages/Index.tsx`
+- `src/components/ConfirmDialog.tsx`
+- `tailwind.config.ts`, `src/index.css`
+- `supabase/functions/send-sia-event/index.ts`
+- `supabase/functions/send-whatsapp/index.ts` (etiqueta)
+- Posible migración para `alarms.alarm_type` si hay CHECK/enum.

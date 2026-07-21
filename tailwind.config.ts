@@ -56,6 +56,7 @@ export default {
           medical: "hsl(var(--emergency-medical))",
           fire: "hsl(var(--emergency-fire))",
           disaster: "hsl(var(--emergency-disaster))",
+          domestic: "hsl(var(--emergency-domestic))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",

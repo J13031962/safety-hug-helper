@@ -14,7 +14,8 @@ const EVENT_CODES: Record<string, string> = {
   fire: "FA",
   medical: "MA",
   disaster: "BA",
-  test: "OP",
+  domestic: "HA",
+  test: "TA",
 };
 
 Deno.serve(async (req) => {
@@ -94,8 +95,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // For test events (OP), zone is not needed — send without zone suffix
-    const zoneStr = alarm_type === "test" ? "" : zone;
+    const zoneStr = zone;
     const message = `"SIA-DCS"0001L0#${accountNumber}[#${accountNumber}|${eventCode}${zoneStr}]_\r\n`;
     console.log("[SIA] Sending:", message.trim(), "to", SIA_HOST, SIA_PORT);
 
