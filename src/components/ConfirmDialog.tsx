@@ -10,13 +10,14 @@ import { toast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle2, MapPin, Loader2, ShieldX } from "lucide-react";
 import { reverseGeocode } from "@/lib/geocode";
 
-type AlarmType = "panic" | "medical" | "fire" | "disaster";
+type AlarmType = "panic" | "medical" | "fire" | "disaster" | "domestic";
 
 const alarmConfig: Record<AlarmType, { label: string; emoji: string; colorClass: string; bgClass: string }> = {
   panic: { label: "PÁNICO", emoji: "🔴", colorClass: "text-emergency-panic", bgClass: "bg-emergency-panic" },
   medical: { label: "MÉDICA", emoji: "🔵", colorClass: "text-emergency-medical", bgClass: "bg-emergency-medical" },
   fire: { label: "INCENDIO", emoji: "🟠", colorClass: "text-emergency-fire", bgClass: "bg-emergency-fire" },
   disaster: { label: "DESASTRE", emoji: "🟡", colorClass: "text-emergency-disaster", bgClass: "bg-emergency-disaster" },
+  domestic: { label: "VIOLENCIA INTRAFAMILIAR", emoji: "🟢", colorClass: "text-emergency-domestic", bgClass: "bg-emergency-domestic" },
 };
 
 interface ParcelInfo {

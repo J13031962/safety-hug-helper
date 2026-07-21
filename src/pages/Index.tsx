@@ -7,7 +7,7 @@ import TestSirenDialog from "@/components/TestSirenDialog";
 import PhoneGate from "@/components/PhoneGate";
 import smartsosLogo from "@/assets/smartsos-logo.png";
 
-type AlarmType = "panic" | "medical" | "fire" | "disaster";
+type AlarmType = "panic" | "medical" | "fire" | "disaster" | "domestic";
 
 interface ParcelInfo {
   parcelName: string;
