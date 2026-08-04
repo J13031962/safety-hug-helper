@@ -9,6 +9,18 @@ interface State {
   info: ErrorInfo | null;
 }
 
+const RELOAD_FLAG = "sosalerta_dom_recovery";
+
+const isDomMutationError = (error: Error) => {
+  const msg = `${error.name} ${error.message}`.toLowerCase();
+  return (
+    msg.includes("removechild") ||
+    msg.includes("insertbefore") ||
+    msg.includes("notfounderror") ||
+    msg.includes("no es hijo de este nodo")
+  );
+};
+
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null, info: null };
 
@@ -19,9 +31,29 @@ export default class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[ErrorBoundary] captured error:", error, info);
     this.setState({ info });
+
+    // Errores típicos de traductores automáticos que rompen el DOM:
+    // recuperar automáticamente recargando una sola vez.
+    if (isDomMutationError(error)) {
+      try {
+        const already = sessionStorage.getItem(RELOAD_FLAG);
+        if (!already) {
+          sessionStorage.setItem(RELOAD_FLAG, String(Date.now()));
+          window.location.reload();
+          return;
+        }
+      } catch (_) {
+        // sessionStorage no disponible: mostrar pantalla de error normal
+      }
+    }
   }
 
   handleReload = () => {
+    try {
+      sessionStorage.removeItem(RELOAD_FLAG);
+    } catch (_) {
+      // ignore
+    }
     window.location.reload();
   };
 
