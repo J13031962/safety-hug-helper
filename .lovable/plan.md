@@ -1,18 +1,27 @@
-Ajustar el centrado del botón **VIOLENCIA INTRAFAMILIAR** para que quede exactamente alineado con la mitad entre los botones **INCENDIO** y **DESASTRE**.
+# Arreglar pantalla en blanco por traducción automática del navegador
 
-## Problema actual
-En `EmergencyGrid.tsx` el botón verde está dentro de un contenedor flex con `w-[calc(50%-0.375rem)]` y `items-center`. Esto lo centra aproximadamente, pero no garantiza una alineación exacta con la línea media entre las dos celdas inferiores, lo que se nota en el preview.
+## Diagnóstico
 
-## Cambio propuesto
-Refactorizar el layout del grid para usar una sola grilla de 4 columnas:
-- Los 4 botones principales ocupan 2 columnas cada uno (`col-span-2`), manteniendo sus mismas dimensiones.
-- El botón **VIOLENCIA** ocupa las 2 columnas centrales (`col-start-2 col-span-2`), quedando así perfectamente centrado sobre el espacio entre **INCENDIO** y **DESASTRE**.
+El error `NotFoundError: removeChild ... no es hijo de este nodo` es un conflicto conocido entre React y el traductor automático de Chrome/Android: el traductor reemplaza los nodos de texto del DOM por sus propios nodos, y cuando React intenta actualizar o quitar el nodo original (al abrir/cerrar el diálogo de "Prueba de Sirenas") ya no existe, lo que rompe el árbol y deja la pantalla del color de fondo.
 
-## Archivos a modificar
-- `src/components/EmergencyGrid.tsx`: reemplazar el grid 2×2 + contenedor flex por un grid 4 columnas con `col-span-2` / `col-start-2 col-span-2`.
+Confirma el diagnóstico el hecho de que al desactivar la traducción automática el error desaparece.
 
-## Verificación
-- Revisar visualmente en el preview que el botón verde queda centrado entre INCENDIO y DESASTRE.
-- Probar en viewport móvil (≤390 px) para confirmar que no se desplaza hacia un lado.
+## Qué se va a hacer
 
-No se requieren cambios en backend, SIA, WhatsApp ni en la base de datos; es solo un ajuste de layout CSS.
+1. **Declarar el idioma real y bloquear la traducción automática** (`index.html`):
+   - `<html lang="es" translate="no">`
+   - `<meta name="google" content="notranslate" />`
+   - clase `notranslate` en `<body>` y en `#root`
+   Con esto Chrome ya no ofrece ni aplica traducción sobre la app (la app está en español, así que no se pierde nada para el usuario).
+
+2. **Blindaje adicional en el contenedor de la app** (`src/main.tsx` / `App.tsx`): marcar el árbol raíz con `translate="no"` para cubrir traductores que ignoran el meta.
+
+3. **Recuperación automática del ErrorBoundary** (`src/components/ErrorBoundary.tsx`): si aun así ocurre un error de tipo `removeChild`/`insertBefore` (NotFoundError), en lugar de dejar la pantalla de error, recargar la vista automáticamente una sola vez para que el usuario no quede bloqueado.
+
+4. **Limpieza de metadatos**: corregir `og:title`, `og:description` y `twitter:*` que hoy dicen "Lovable App" / "Lovable Generated Project" por los de SmartSOS.
+
+## Notas técnicas
+
+- No se cambia ninguna lógica de alarmas, sirenas, SIA ni WhatsApp.
+- Los cambios son de presentación/robustez del frontend.
+- Los usuarios recibirán el arreglo con el sistema de auto-actualización ya existente (`version.json` + `useAutoUpdate`) tras publicar.
