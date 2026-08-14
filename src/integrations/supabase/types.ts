@@ -65,6 +65,135 @@ export type Database = {
         }
         Relationships: []
       }
+      ble_devices: {
+        Row: {
+          battery: number | null
+          created_at: string
+          created_by: string | null
+          device_id: string
+          device_identifier: string | null
+          enabled: boolean
+          id: string
+          last_seen_at: string | null
+          manufacturer: string | null
+          model: string | null
+          name: string | null
+          parcel_id: string
+          phone_number: string | null
+          profile: string | null
+          registered_number_id: string | null
+          rssi: number | null
+          token_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          battery?: number | null
+          created_at?: string
+          created_by?: string | null
+          device_id: string
+          device_identifier?: string | null
+          enabled?: boolean
+          id?: string
+          last_seen_at?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          name?: string | null
+          parcel_id: string
+          phone_number?: string | null
+          profile?: string | null
+          registered_number_id?: string | null
+          rssi?: number | null
+          token_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          battery?: number | null
+          created_at?: string
+          created_by?: string | null
+          device_id?: string
+          device_identifier?: string | null
+          enabled?: boolean
+          id?: string
+          last_seen_at?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          name?: string | null
+          parcel_id?: string
+          phone_number?: string | null
+          profile?: string | null
+          registered_number_id?: string | null
+          rssi?: number | null
+          token_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ble_devices_parcel_id_fkey"
+            columns: ["parcel_id"]
+            isOneToOne: false
+            referencedRelation: "parcels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ble_devices_registered_number_id_fkey"
+            columns: ["registered_number_id"]
+            isOneToOne: false
+            referencedRelation: "registered_numbers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ble_events: {
+        Row: {
+          alarm_id: string | null
+          ble_device_id: string | null
+          button: string
+          created_at: string
+          event_id: string
+          id: string
+          payload: Json | null
+          pressed_at: string | null
+          received_at: string
+        }
+        Insert: {
+          alarm_id?: string | null
+          ble_device_id?: string | null
+          button: string
+          created_at?: string
+          event_id: string
+          id?: string
+          payload?: Json | null
+          pressed_at?: string | null
+          received_at?: string
+        }
+        Update: {
+          alarm_id?: string | null
+          ble_device_id?: string | null
+          button?: string
+          created_at?: string
+          event_id?: string
+          id?: string
+          payload?: Json | null
+          pressed_at?: string | null
+          received_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ble_events_alarm_id_fkey"
+            columns: ["alarm_id"]
+            isOneToOne: false
+            referencedRelation: "alarms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ble_events_ble_device_id_fkey"
+            columns: ["ble_device_id"]
+            isOneToOne: false
+            referencedRelation: "ble_devices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gps_device_parcels: {
         Row: {
           created_at: string | null
