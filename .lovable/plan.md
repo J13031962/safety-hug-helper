@@ -41,8 +41,9 @@ Códigos que la app debe manejar:
 ## 2. Cambios en este backend
 
 1. **`simulated: true`** en `ble-button-event`: valida token, dispositivo, parcelación y payload, registra el evento en `ble_events` y responde `{success:true, simulated:true}` **sin** insertar alarma ni invocar GPS/WhatsApp/SIA. Así el botón "Probar backend" de la app no dispara sirena.
-2. **Dispositivo para el token global**: alta de un dispositivo (`SMARTSOS-MOBILE-01`, parcelación de pruebas, `enabled = true`) **sin** `token_hash`, para que valide contra `BLE_GATEWAY_TOKEN`. El actual `BLE-TEST-001` tiene token propio y no sirve con el token global.
+2. **Dispositivo y token para el teléfono**: alta del dispositivo `SMARTSOS-MOBILE-01` (parcelación de pruebas, `enabled = true`) con **token propio**: genero un token aleatorio, guardo solo su SHA-256 en `ble_devices.token_hash` y te muestro el valor en claro una vez en el chat para que lo pegues en el campo "Token BLE" del teléfono. Es exactamente lo que pide la app (viaja en `x-ble-token`, no es clave de servicio). Si prefieres el token global, uso `BLE_GATEWAY_TOKEN` y dejo el dispositivo sin `token_hash`, pero ese token sirve para cualquier dispositivo habilitado.
 3. **`docs/ble-button-event.md`**: añadir el flag `simulated`, la nota de que la dedup devuelve 200 (no 409) y el bloque de contrato listo para pegar en `docs/BACKEND.md` del otro proyecto.
+
 
 ## 3. Fuera de alcance
 
