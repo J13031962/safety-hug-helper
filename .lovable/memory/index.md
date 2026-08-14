@@ -15,3 +15,4 @@ GPS devices linked to parcels via gps_device_parcels (many-to-many).
 - [WhatsApp Alerts](mem://features/whatsapp-alerts) — Message formatting and group-only delivery rules
 - [Multi-Parcel Flow](mem://features/multi-parcel-flow) — Handling users registered in multiple parcels
 - [SIA-DCS CRA](mem://features/sia-dcs) — SIA-DCS protocol, event codes (PA/FA/MA/BA/OP), test button, multi-parcel GPS
+- [BLE Gateway](mem://features/ble-gateway) — Endpoint ble-button-event, ble_devices/ble_events, token x-ble-token, dedup en BD
