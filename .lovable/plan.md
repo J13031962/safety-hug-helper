@@ -25,7 +25,7 @@ No hay ningún `DROP TABLE`, `DROP SCHEMA`, `TRUNCATE`, `DELETE` ni referencia a
 3. Verificar: `SELECT table_name FROM information_schema.tables WHERE table_schema='smartsos';` (deben salir 11 tablas) y confirmar que `public` sigue intacto.
 4. Ejecutar `03_data.sql` (solo inserta en `smartsos.*`).
 5. Ejecutar `02_cron.sql` reemplazando `<PROJECT_REF>` y `<SERVICE_ROLE_KEY>`.
-6. Recrear usuarios de Auth según `04_auth_users.md` y remapear perfiles/roles.
+6. Recrear los 6 usuarios en Auth usando **los mismos emails** que ya existen en Halcón (no crear nuevos emails; solo invitar/crear con contraseña temporal). Luego ejecutar el bloque SQL de `04_auth_users.md` para perfiles, roles y asignaciones.
 
 Después de eso se adapta la app (`VITE_DB_SCHEMA=smartsos`, `DB_SCHEMA=smartsos`) y solo al final se desconecta Cloud.
 
