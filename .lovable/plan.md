@@ -16,6 +16,14 @@ Por lo tanto el orden obligatorio es:
 
 El paso 3 destruye la base actual (Cloud), por eso no se toca hasta que Halcón tenga todo cargado y probado.
 
+## Proyecto destino y credenciales
+
+- Proyecto destino: `https://junctwbyjtjhwjjioytc.supabase.co` (ref `junctwbyjtjhwjjioytc`).
+- **No hace falta la contraseña de la base de datos ni la service role key en el chat**: el conector Supabase usa OAuth y Lovable recupera las claves de forma segura.
+- La contraseña de `postgresql://postgres:[YOUR-PASSWORD]@db.junctwbyjtjhwjjioytc.supabase.co:5432/postgres` está en tu dashboard de Supabase → Project Settings → Database → Reset database password. Solo la necesitas si prefieres cargar el SQL con `psql` en lugar de pegarlo en el SQL Editor.
+- El SQL de las fases 1 y 2 se puede aplicar entero desde el SQL Editor del proyecto, sin contraseña.
+
+
 ## Fase 1 — Artefactos (lo que preparo ahora)
 
 - `migration/halcon/01_schema.sql`: schema `smartsos` completo — enum `app_role`, las 12 tablas (`parcels`, `profiles`, `user_roles`, `operator_parcels`, `registered_numbers`, `alarms`, `gps_devices`, `gps_device_parcels`, `gps_relay_jobs`, `ble_devices`, `ble_events`), índices, GRANTs, RLS con todas las políticas actuales y las 6 funciones (`has_role`, `handle_new_user`, `operator_parcel_names`, `update_updated_at_column`, etc.) con `search_path` al nuevo schema.
