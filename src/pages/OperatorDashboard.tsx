@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { db, DB_SCHEMA } from "@/integrations/supabase/db";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +60,7 @@ export default function OperatorDashboard() {
   // Fetch operator profiles
   useEffect(() => {
     const fetchProfiles = async () => {
-      const { data } = await supabase.from("profiles").select("user_id, full_name, email");
+      const { data } = await db.from("profiles").select("user_id, full_name, email");
       const map: Record<string, string> = {};
       (data || []).forEach((p) => { map[p.user_id] = p.full_name || p.email || "—"; });
       setOperatorMap(map);
@@ -71,7 +71,7 @@ export default function OperatorDashboard() {
   // Fetch alarms
   useEffect(() => {
     const fetchAlarms = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from("alarms")
         .select("*")
         .order("created_at", { ascending: false })
@@ -81,9 +81,9 @@ export default function OperatorDashboard() {
     fetchAlarms();
 
     // Realtime subscription
-    const channel = supabase
+    const channel = db
       .channel("alarms-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "alarms" }, (payload) => {
+      .on("postgres_changes", { event: "*", schema: DB_SCHEMA, table: "alarms" }, (payload) => {
         if (payload.eventType === "INSERT") {
           setAlarms((prev) => [payload.new as Alarm, ...prev]);
           // Speak alarm type
@@ -132,7 +132,7 @@ export default function OperatorDashboard() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { db.removeChannel(channel); };
   }, []);
 
   const handleProcess = async (alarm: Alarm, newStatus: string) => {
@@ -150,7 +150,7 @@ export default function OperatorDashboard() {
       updateData.observations = observations.trim();
     }
 
-    const { error } = await supabase.from("alarms").update(updateData).eq("id", alarm.id);
+    const { error } = await db.from("alarms").update(updateData).eq("id", alarm.id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {

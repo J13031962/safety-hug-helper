@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -34,19 +35,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const result = await withTimeout(
-          Promise.resolve(supabase.from("user_roles").select("role").eq("user_id", userId).maybeSingle()),
+          Promise.resolve(db.from("user_roles").select("role").eq("user_id", userId).maybeSingle()),
           5000
         ) as { data: { role: AppRole } | null; error: any };
         const { data, error } = result;
         if (error) {
           // Fallback: try RPC
-          const { data: hasAdmin } = await supabase.rpc("has_role", { _user_id: userId, _role: "admin" as AppRole });
+          const { data: hasAdmin } = await db.rpc("has_role", { _user_id: userId, _role: "admin" as AppRole });
           if (hasAdmin) { setRole("admin"); return; }
-          const { data: hasOp } = await supabase.rpc("has_role", { _user_id: userId, _role: "operator" as AppRole });
+          const { data: hasOp } = await db.rpc("has_role", { _user_id: userId, _role: "operator" as AppRole });
           if (hasOp) { setRole("operator"); return; }
-          const { data: hasDir } = await supabase.rpc("has_role", { _user_id: userId, _role: "director_monitoreo" as AppRole });
+          const { data: hasDir } = await db.rpc("has_role", { _user_id: userId, _role: "director_monitoreo" as AppRole });
           if (hasDir) { setRole("director_monitoreo"); return; }
-          const { data: hasSup } = await supabase.rpc("has_role", { _user_id: userId, _role: "supervisor_central" as AppRole });
+          const { data: hasSup } = await db.rpc("has_role", { _user_id: userId, _role: "supervisor_central" as AppRole });
           if (hasSup) { setRole("supervisor_central"); return; }
           setRole(null);
           return;

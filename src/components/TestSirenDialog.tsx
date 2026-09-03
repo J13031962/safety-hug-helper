@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { toast } from "@/hooks/use-toast";
 import { Radio, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
@@ -45,7 +46,7 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
         return;
       }
 
-      const { data: dpData, error: dpErr } = await supabase
+      const { data: dpData, error: dpErr } = await db
         .from("gps_device_parcels")
         .select("device_id, parcel_name")
         .in("parcel_name", userParcels);
@@ -59,7 +60,7 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
       }
 
       const deviceIds = [...new Set(dpData.map((dp) => dp.device_id))];
-      const { data: devices, error: devErr } = await supabase
+      const { data: devices, error: devErr } = await db
         .from("gps_devices")
         .select("id, imei, model, relay_duration, name")
         .in("id", deviceIds);

@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { toast } from "@/hooks/use-toast";
 import { AlertCircle, CheckCircle2, MapPin, Loader2, ShieldX } from "lucide-react";
 import { reverseGeocode } from "@/lib/geocode";
@@ -111,7 +112,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
 
       const phoneDigits = phone.replace(/\D/g, "");
 
-      const { data: allNumbers } = await supabase
+      const { data: allNumbers } = await db
         .from("registered_numbers")
         .select("id, phone_number");
 
@@ -195,7 +196,7 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
       address: finalAddress || null,
     };
 
-    const { error } = await supabase
+    const { error } = await db
       .from("alarms")
       .insert(alarmData);
 

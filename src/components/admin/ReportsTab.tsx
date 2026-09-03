@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -99,7 +99,7 @@ export default function ReportsTab() {
 
   const downloadAlarms = async () => {
     setLoading(true);
-    let query = supabase.from("alarms").select("*").order("created_at", { ascending: false });
+    let query = db.from("alarms").select("*").order("created_at", { ascending: false });
     query = buildDateFilter(query, "created_at");
     const { data } = await query;
 
@@ -107,7 +107,7 @@ export default function ReportsTab() {
     const operatorIds = [...new Set((data || []).map((a) => a.processed_by).filter(Boolean))] as string[];
     let operatorMap: Record<string, string> = {};
     if (operatorIds.length > 0) {
-      const { data: profiles } = await supabase.from("profiles").select("user_id, full_name, email").in("user_id", operatorIds);
+      const { data: profiles } = await db.from("profiles").select("user_id, full_name, email").in("user_id", operatorIds);
       (profiles || []).forEach((p) => { operatorMap[p.user_id] = p.full_name || p.email || "—"; });
     }
 
@@ -127,7 +127,7 @@ export default function ReportsTab() {
 
   const downloadGps = async () => {
     setLoading(true);
-    let query = supabase.from("gps_devices").select("*").order("created_at", { ascending: false });
+    let query = db.from("gps_devices").select("*").order("created_at", { ascending: false });
     query = buildDateFilter(query, "created_at");
     const { data } = await query;
     const rows = (data || []).map((d) => [
@@ -142,7 +142,7 @@ export default function ReportsTab() {
 
   const downloadUsers = async () => {
     setLoading(true);
-    let query = supabase.from("profiles").select("*, user_roles(role)").order("created_at", { ascending: false });
+    let query = db.from("profiles").select("*, user_roles(role)").order("created_at", { ascending: false });
     query = buildDateFilter(query, "created_at");
     const { data } = await query;
     const roleLabels: Record<string, string> = {
@@ -160,7 +160,7 @@ export default function ReportsTab() {
 
   const downloadWhatsapp = async () => {
     setLoading(true);
-    let query = supabase.from("registered_numbers").select("*").order("created_at", { ascending: false });
+    let query = db.from("registered_numbers").select("*").order("created_at", { ascending: false });
     query = buildDateFilter(query, "created_at");
     const { data } = await query;
     const rows = (data || []).map((n) => [

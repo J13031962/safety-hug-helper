@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +35,7 @@ export default function ParcelsTab() {
 
   const fetchParcels = async () => {
     setLoading(true);
-    const { data } = await supabase.from("parcels").select("*").order("name");
+    const { data } = await db.from("parcels").select("*").order("name");
     setParcels((data as Parcel[]) || []);
     setLoading(false);
   };
@@ -67,11 +68,11 @@ export default function ParcelsTab() {
     };
 
     if (editing) {
-      const { error } = await supabase.from("parcels").update(payload).eq("id", editing.id);
+      const { error } = await db.from("parcels").update(payload).eq("id", editing.id);
       if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
       else toast({ title: "Parcela actualizada" });
     } else {
-      const { error } = await supabase.from("parcels").insert(payload);
+      const { error } = await db.from("parcels").insert(payload);
       if (error) {
         const isDuplicate = error.message.includes("duplicate") || error.code === "23505";
         toast({ title: "Error", description: isDuplicate ? "Ya existe una parcela con ese nombre" : error.message, variant: "destructive" });
@@ -87,7 +88,7 @@ export default function ParcelsTab() {
 
   const handleDelete = async (p: Parcel) => {
     if (!confirm(`¿Eliminar parcela "${p.name}"?`)) return;
-    const { error } = await supabase.from("parcels").delete().eq("id", p.id);
+    const { error } = await db.from("parcels").delete().eq("id", p.id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else { toast({ title: "Eliminada" }); fetchParcels(); }
   };
@@ -116,7 +117,7 @@ export default function ParcelsTab() {
 
       if (data?.group_id) {
         // Save to parcel
-        const { error: updateErr } = await supabase
+        const { error: updateErr } = await db
           .from("parcels")
           .update({ whatsapp_group_id: data.group_id })
           .eq("id", resolveTarget.id);

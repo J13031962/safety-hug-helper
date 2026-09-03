@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Shield, Loader2, Phone, AlertCircle } from "lucide-react";
@@ -35,7 +35,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
         } else {
           // Old format without parcels - re-fetch
           const digits = settings.phoneNumber.replace(/\D/g, "");
-          supabase
+          db
             .from("registered_numbers")
             .select("phone_number, owner_name, house_number, parcel_name, is_parcel_admin")
             .then(({ data }) => {
@@ -78,7 +78,7 @@ export default function PhoneGate({ children }: PhoneGateProps) {
     setError(null);
 
     try {
-      const { data: allNumbers } = await supabase
+      const { data: allNumbers } = await db
         .from("registered_numbers")
         .select("phone_number, owner_name, house_number, parcel_name, is_parcel_admin");
 

@@ -99,12 +99,22 @@ Reapuntar:
 - App móvil SmartSOS Mobile (`VITE_SMARTSOS_BACKEND_URL`) a
   `https://junctwbyjtjhwjjioytc.supabase.co`
 
-### 10. Cambios de código (Fase 2, se aplican tras el paso 7)
+### 10. Cambios de código (YA APLICADOS — solo hay que activar el interruptor)
 
-- Cliente Supabase: añadir `db: { schema: 'smartsos' }` en `createClient`, de modo que **todos** los
-  `.from('alarms')`, `.from('parcels')`, etc. de las 13 pantallas/hooks sigan igual sin reescribirse.
-- Edge Functions: en cada `createClient(...)` del servidor añadir la misma opción
-  `{ db: { schema: 'smartsos' } }`.
+El código ya está preparado. No hay que reescribir ninguna consulta: solo definir dos variables.
+
+| Dónde | Variable | Valor |
+|---|---|---|
+| Frontend (`.env` del proyecto / build) | `VITE_DB_SCHEMA` | `smartsos` |
+| Edge Functions (secretos del proyecto) | `DB_SCHEMA` | `smartsos` |
+
+Si no se definen, todo sigue apuntando a `public` (comportamiento actual, sin riesgo).
+
+- Frontend: `src/integrations/supabase/db.ts` crea el cliente de datos con
+  `db: { schema: VITE_DB_SCHEMA }`. Las 13 pantallas/hooks ya importan `db` para `.from()`, `.rpc()`
+  y realtime; `supabase.auth` y `supabase.functions` siguen igual.
+- Edge Functions: `supabase/functions/_shared/dbSchema.ts` exporta `dbOptions`, ya aplicado en los
+  `createClient(...)` de las 9 funciones.
 - Funciones de BD invocadas por RPC/RLS ya viven en `smartsos` (`has_role`, `operator_parcel_names`).
 - Sin cambios funcionales: los 5 botones, los códigos SIA (`PA`, `MA`, `FA`, `BA`, `HA001`, prueba
   `TA001`), la lógica invertida de Traccar (`engineStop` activa, `engineResume` apaga) y el flujo de

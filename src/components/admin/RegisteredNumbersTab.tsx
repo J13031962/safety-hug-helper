@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -119,10 +119,10 @@ export default function RegisteredNumbersTab() {
   const fetchData = async () => {
     setLoading(true);
     const [numbersRes, parcelsRes, devicesRes, dpRes] = await Promise.all([
-      supabase.from("registered_numbers").select("*").order("created_at", { ascending: false }),
-      supabase.from("parcels").select("id, name, whatsapp_group_id").order("name"),
-      supabase.from("gps_devices").select("*"),
-      supabase.from("gps_device_parcels").select("device_id, parcel_name"),
+      db.from("registered_numbers").select("*").order("created_at", { ascending: false }),
+      db.from("parcels").select("id, name, whatsapp_group_id").order("name"),
+      db.from("gps_devices").select("*"),
+      db.from("gps_device_parcels").select("device_id, parcel_name"),
     ]);
     setNumbers(numbersRes.data || []);
     setParcels((parcelsRes.data as Parcel[]) || []);
@@ -189,7 +189,7 @@ export default function RegisteredNumbersTab() {
         const existing = groupedUsers.find((g) => g.phone_number.replace(/\D/g, "") === editingPhone);
         if (existing) {
           for (const id of existing.ids) {
-            await supabase.from("registered_numbers").delete().eq("id", id);
+            await db.from("registered_numbers").delete().eq("id", id);
           }
         }
       }
@@ -203,7 +203,7 @@ export default function RegisteredNumbersTab() {
         is_parcel_admin: form.is_parcel_admin,
       }));
 
-      const { error } = await supabase.from("registered_numbers").insert(rows);
+      const { error } = await db.from("registered_numbers").insert(rows);
       if (error) {
         toast({ title: "Error", description: error.message, variant: "destructive" });
         setSubmitting(false);
@@ -222,7 +222,7 @@ export default function RegisteredNumbersTab() {
   const handleDelete = async (g: GroupedUser) => {
     if (!confirm(`¿Eliminar ${g.owner_name}?`)) return;
     for (const id of g.ids) {
-      await supabase.from("registered_numbers").delete().eq("id", id);
+      await db.from("registered_numbers").delete().eq("id", id);
     }
     toast({ title: "Eliminado" });
     fetchData();
@@ -234,7 +234,7 @@ export default function RegisteredNumbersTab() {
       return;
     }
     setRenaming(true);
-    const { error } = await supabase
+    const { error } = await db
       .from("registered_numbers")
       .update({ parcel_name: renameTo.trim() })
       .eq("parcel_name", renameFrom);
@@ -251,7 +251,7 @@ export default function RegisteredNumbersTab() {
   const handleSaveCra = async (deviceId: string) => {
     setSavingCra(deviceId);
     const value = craEdits[deviceId]?.trim() || null;
-    const { error } = await supabase
+    const { error } = await db
       .from("gps_devices")
       .update({ cra_user_number: value })
       .eq("id", deviceId);

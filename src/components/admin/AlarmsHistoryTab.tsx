@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +29,7 @@ export default function AlarmsHistoryTab() {
 
   useEffect(() => {
     const fetchAlarms = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from("alarms")
         .select("*")
         .order("created_at", { ascending: false })
