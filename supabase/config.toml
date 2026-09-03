@@ -1,4 +1,4 @@
-project_id = "xvojmfakqlzplbzaoqdi"
+project_id = "junctwbyjtjhwjjioytc"
 
 [functions.traccar-webhook]
 verify_jwt = false
