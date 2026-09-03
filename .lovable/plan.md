@@ -28,3 +28,12 @@ No hay ningún `DROP TABLE`, `DROP SCHEMA`, `TRUNCATE`, `DELETE` ni referencia a
 6. Recrear usuarios de Auth según `04_auth_users.md` y remapear perfiles/roles.
 
 Después de eso se adapta la app (`VITE_DB_SCHEMA=smartsos`, `DB_SCHEMA=smartsos`) y solo al final se desconecta Cloud.
+
+## Sobre exponer el schema en la API (paso ya hecho)
+
+Exponer `smartsos` en Settings > API es correcto y necesario para que la app lea/escriba vía Data API. Consideraciones:
+
+- Los toggles de "Exposed tables/functions" son por objeto: hay que verificar que las 11 tablas `smartsos.*` queden expuestas (y las funciones `has_role`, `operator_parcel_names` si se llaman por RPC).
+- Exponer el schema no otorga permisos por sí solo: el acceso real lo definen los GRANT y las políticas RLS del script, que ya están incluidos.
+- Que 70 de 82 tablas y 115 de 120 funciones estén expuestas es una configuración de Halcón; no hace falta cambiar el resto, solo asegurar los objetos de `smartsos`.
+- Verificación después de correr los scripts: `SELECT * FROM smartsos.parcels LIMIT 1;` desde el editor y una lectura desde la app con `VITE_DB_SCHEMA=smartsos`.
