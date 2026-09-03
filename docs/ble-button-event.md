@@ -74,7 +74,7 @@ Dispositivo de prueba ya creado: `BLE-TEST-001`, parcelación **Teleguardia**, `
 BLE_TOKEN="<token del dispositivo de prueba>"
 EVENT_ID=$(uuidgen)
 
-curl -i -X POST "https://xvojmfakqlzplbzaoqdi.supabase.co/functions/v1/ble-button-event" \
+curl -i -X POST "https://junctwbyjtjhwjjioytc.supabase.co/functions/v1/ble-button-event" \
   -H "Content-Type: application/json" \
   -H "x-ble-token: $BLE_TOKEN" \
   -d "{
