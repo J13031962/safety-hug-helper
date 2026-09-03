@@ -27,7 +27,7 @@ No hay ningún `DROP TABLE`, `DROP SCHEMA`, `TRUNCATE`, `DELETE` ni referencia a
 5. Ejecutar `02_cron.sql` reemplazando `<PROJECT_REF>` y `<SERVICE_ROLE_KEY>`.
 6. Recrear los 6 usuarios en Auth usando **los mismos emails** que ya existen en Halcón (no crear nuevos emails; solo invitar/crear con contraseña temporal). Luego ejecutar el bloque SQL de `04_auth_users.md` para perfiles, roles y asignaciones.
 
-Después de eso se adapta la app (`VITE_DB_SCHEMA=smartsos`, `DB_SCHEMA=smartsos`) y solo al final se desconecta Cloud.
+Después de eso se adapta la app (`VITE_DB_SCHEMA=smartsos`, `DB_SCHEMA=smartsos`) y solo al final se desconecta Cloud. Los roles de Halcón en `public.user_roles` no se tocan: SmartSOS tendrá su propia tabla `smartsos.user_roles`.
 
 ## Sobre exponer el schema en la API (paso ya hecho)
 
