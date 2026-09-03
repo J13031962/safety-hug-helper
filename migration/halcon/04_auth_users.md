@@ -1,74 +1,76 @@
 # Recrear los usuarios en Auth del proyecto destino
 
-Auth **no se puede migrar por SQL**: hay que crear cada usuario de nuevo (con contraseña nueva)
-y luego remapear su `user_id` en `smartsos.profiles`, `smartsos.user_roles` y `smartsos.operator_parcels`.
+Auth **no se migra por SQL**: hay que crear cada usuario de nuevo (con contraseña nueva) y luego
+recrear sus perfiles, roles y asignaciones de parcelación. Todo se resuelve **por email**, así que
+no hay que copiar UUIDs a mano.
 
 ## 1. Usuarios actuales
 
-| Email | Nombre | Rol | user_id actual (Cloud) |
+| Email | Nombre | Rol | Parcelaciones asignadas |
 |---|---|---|---|
-| admin@teleguardia.com | Administrador Principal | admin | 5855873a-73c9-4e84-a900-5f96ac5ab582 |
-| santiago.barrientos@teleguardia.com | Santiago Barrientos | director_monitoreo | 2158229d-fa08-4308-b7d5-47f28fd13504 |
-| harol.murcia@teleguardia.com | Harol Murcia | director_monitoreo | 419ad2d4-cb9c-4af3-97c5-89d1d2631a5d |
-| ast1@teleguardia.com | FEDERMAN CHAVERRA | director_monitoreo | f7fca85e-072f-43f5-bd3e-f71d46d8f0bc |
-| luis.perez@teleguardia.com | luis perez | operator | 0093d7d4-c2e1-429a-9b4f-4bbf94f4d225 |
-| porteria@casavieja.com | Portería Casa Vieja | operator | 5643bffd-70fa-4fbd-b38b-ae49e6daab56 |
-
-Asignaciones de parcelación de operadores (tabla `operator_parcels`):
-
-- `luis.perez@teleguardia.com` y `porteria@casavieja.com`: ver `03_data.sql`; las filas apuntan a
-  `parcels.id`, que **no cambia** porque se migran con el mismo UUID. Solo cambia `user_id`.
+| admin@teleguardia.com | Administrador Principal | admin | — (ve todo) |
+| santiago.barrientos@teleguardia.com | Santiago Barrientos | director_monitoreo | — (ve todo) |
+| harol.murcia@teleguardia.com | Harol Murcia | director_monitoreo | — (ve todo) |
+| ast1@teleguardia.com | FEDERMAN CHAVERRA | director_monitoreo | — (ve todo) |
+| luis.perez@teleguardia.com | luis perez | operator | Casa Vieja |
+| porteria@casavieja.com | Portería Casa Vieja | operator | Casa Vieja |
 
 ## 2. Crear los usuarios
 
-En el dashboard del proyecto destino: **Authentication → Users → Add user**, con
-*Auto Confirm User* activado, y una contraseña temporal por usuario. Crea los 6 emails de la tabla.
+Dashboard del proyecto destino → **Authentication → Users → Add user**, con *Auto Confirm User*
+activado y una contraseña temporal por usuario. Crea los 6 emails de la tabla.
 
-> No habilites registro público (sign-ups) si no lo necesitas: los usuarios se crean desde /admin.
+No habilites registro público: los usuarios se crean desde `/admin` con la función `create-user`.
 
-## 3. Remapear los IDs
+## 3. Cargar perfiles, roles y asignaciones
 
-Después de crearlos, ejecuta esto en el SQL Editor. Toma el `id` nuevo desde `auth.users` por email,
-así que no hace falta copiar UUIDs a mano:
+Ejecuta este bloque en el SQL Editor **después** de crear los 6 usuarios y de ejecutar `03_data.sql`
+(necesita que existan las parcelaciones):
 
 ```sql
--- Perfiles: apunta cada perfil al nuevo usuario con el mismo email
-UPDATE smartsos.profiles p
-SET user_id = u.id
-FROM auth.users u
-WHERE lower(u.email) = lower(p.email)
-  AND p.user_id <> u.id;
+BEGIN;
 
--- Roles: remapea por el email del perfil
-UPDATE smartsos.user_roles r
-SET user_id = u.id
-FROM smartsos.profiles p
-JOIN auth.users u ON lower(u.email) = lower(p.email)
-WHERE r.user_id IS DISTINCT FROM u.id
-  AND r.user_id IN (
-    '5855873a-73c9-4e84-a900-5f96ac5ab582',
-    '2158229d-fa08-4308-b7d5-47f28fd13504',
-    '419ad2d4-cb9c-4af3-97c5-89d1d2631a5d',
-    'f7fca85e-072f-43f5-bd3e-f71d46d8f0bc',
-    '0093d7d4-c2e1-429a-9b4f-4bbf94f4d225',
-    '5643bffd-70fa-4fbd-b38b-ae49e6daab56'
-  )
-  AND p.user_id = u.id
-  AND r.user_id = CASE lower(p.email)
-    WHEN 'admin@teleguardia.com'               THEN '5855873a-73c9-4e84-a900-5f96ac5ab582'::uuid
-    WHEN 'santiago.barrientos@teleguardia.com' THEN '2158229d-fa08-4308-b7d5-47f28fd13504'::uuid
-    WHEN 'harol.murcia@teleguardia.com'        THEN '419ad2d4-cb9c-4af3-97c5-89d1d2631a5d'::uuid
-    WHEN 'ast1@teleguardia.com'                THEN 'f7fca85e-072f-43f5-bd3e-f71d46d8f0bc'::uuid
-    WHEN 'luis.perez@teleguardia.com'          THEN '0093d7d4-c2e1-429a-9b4f-4bbf94f4d225'::uuid
-    WHEN 'porteria@casavieja.com'              THEN '5643bffd-70fa-4fbd-b38b-ae49e6daab56'::uuid
-  END;
+-- Perfiles (el trigger handle_new_user ya pudo crearlos; esto completa nombre y email)
+INSERT INTO smartsos.profiles (user_id, email, full_name)
+SELECT u.id, u.email, v.full_name
+FROM (VALUES
+  ('admin@teleguardia.com',               'Administrador Principal'),
+  ('santiago.barrientos@teleguardia.com', 'Santiago Barrientos'),
+  ('harol.murcia@teleguardia.com',        'Harol Murcia'),
+  ('ast1@teleguardia.com',                'FEDERMAN CHAVERRA'),
+  ('luis.perez@teleguardia.com',          'luis perez'),
+  ('porteria@casavieja.com',              'Portería Casa Vieja')
+) AS v(email, full_name)
+JOIN auth.users u ON lower(u.email) = v.email
+ON CONFLICT (user_id) DO UPDATE
+  SET email = EXCLUDED.email, full_name = EXCLUDED.full_name;
 
--- Asignaciones de operador: igual criterio
-UPDATE smartsos.operator_parcels op
-SET user_id = u.id
-FROM auth.users u
-WHERE (op.user_id = '0093d7d4-c2e1-429a-9b4f-4bbf94f4d225' AND lower(u.email) = 'luis.perez@teleguardia.com')
-   OR (op.user_id = '5643bffd-70fa-4fbd-b38b-ae49e6daab56' AND lower(u.email) = 'porteria@casavieja.com');
+-- Roles
+INSERT INTO smartsos.user_roles (user_id, role)
+SELECT u.id, v.role::smartsos.app_role
+FROM (VALUES
+  ('admin@teleguardia.com',               'admin'),
+  ('santiago.barrientos@teleguardia.com', 'director_monitoreo'),
+  ('harol.murcia@teleguardia.com',        'director_monitoreo'),
+  ('ast1@teleguardia.com',                'director_monitoreo'),
+  ('luis.perez@teleguardia.com',          'operator'),
+  ('porteria@casavieja.com',              'operator')
+) AS v(email, role)
+JOIN auth.users u ON lower(u.email) = v.email
+ON CONFLICT (user_id, role) DO NOTHING;
+
+-- Asignaciones de parcelación para operadores
+INSERT INTO smartsos.operator_parcels (user_id, parcel_id)
+SELECT u.id, p.id
+FROM (VALUES
+  ('luis.perez@teleguardia.com', 'Casa Vieja'),
+  ('porteria@casavieja.com',     'Casa Vieja')
+) AS v(email, parcel)
+JOIN auth.users u ON lower(u.email) = v.email
+JOIN smartsos.parcels p ON p.name = v.parcel
+ON CONFLICT (user_id, parcel_id) DO NOTHING;
+
+COMMIT;
 ```
 
 ## 4. Verificar
@@ -83,15 +85,9 @@ GROUP BY p.email, r.role
 ORDER BY p.email;
 ```
 
-Debe devolver los 6 usuarios con su rol y, para los dos operadores, sus parcelaciones asignadas.
+Debe devolver los 6 usuarios con su rol, y `1` parcelación para los dos operadores.
 
-## 5. Nota sobre `alarms.processed_by` y `gps_devices.created_by`
+## 5. Nota
 
-Son referencias históricas a `auth.users`. Como los UUID cambian, `03_data.sql` puede fallar en esas
-columnas si el usuario no existe. Si ocurre, límpialas antes de insertar el histórico:
-
-```sql
--- Opción segura: dejar el histórico sin autor
-UPDATE smartsos.alarms       SET processed_by = NULL WHERE processed_by IS NOT NULL;
-UPDATE smartsos.gps_devices  SET created_by   = NULL WHERE created_by   IS NOT NULL;
-```
+`alarms.processed_by` y `gps_devices.created_by` se migran en `NULL` a propósito: eran referencias a
+UUIDs de Auth que ya no existen. No afecta ninguna funcionalidad, solo el "quién atendió" histórico.
