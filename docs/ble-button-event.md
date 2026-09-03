@@ -17,7 +17,7 @@ send-sia-event (CRA)
 ## URL
 
 ```
-POST https://xvojmfakqlzplbzaoqdi.supabase.co/functions/v1/ble-button-event
+POST https://junctwbyjtjhwjjioytc.supabase.co/functions/v1/ble-button-event
 ```
 
 ## Autenticación
