@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,8 +44,8 @@ export default function UsersTab() {
 
   const fetchUsers = async () => {
     setLoading(true);
-    const { data: profiles } = await supabase.from("profiles").select("user_id, email, full_name");
-    const { data: roles } = await supabase.from("user_roles").select("user_id, role");
+    const { data: profiles } = await db.from("profiles").select("user_id, email, full_name");
+    const { data: roles } = await db.from("user_roles").select("user_id, role");
 
     if (profiles) {
       const roleMap = new Map(roles?.map((r) => [r.user_id, r.role]));
@@ -63,14 +64,14 @@ export default function UsersTab() {
   useEffect(() => {
     fetchUsers();
     setParcelsLoading(true);
-    supabase.from("parcels").select("id, name").order("name").then(({ data }) => {
+    db.from("parcels").select("id, name").order("name").then(({ data }) => {
       setParcels(data || []);
       setParcelsLoading(false);
     });
   }, []);
 
   const loadOperatorParcels = async (userId: string) => {
-    const { data } = await supabase.from("operator_parcels").select("parcel_id").eq("user_id", userId);
+    const { data } = await db.from("operator_parcels").select("parcel_id").eq("user_id", userId);
     setSelectedParcelIds((data || []).map((r: any) => r.parcel_id));
   };
 

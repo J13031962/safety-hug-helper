@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,8 +32,8 @@ export default function GpsDevicesTab() {
   const fetchDevices = async () => {
     setLoading(true);
     const [devRes, dpRes] = await Promise.all([
-      supabase.from("gps_devices").select("*").order("created_at", { ascending: false }),
-      supabase.from("gps_device_parcels").select("device_id, parcel_name"),
+      db.from("gps_devices").select("*").order("created_at", { ascending: false }),
+      db.from("gps_device_parcels").select("device_id, parcel_name"),
     ]);
     const devs = devRes.data || [];
     const dps = dpRes.data || [];
@@ -45,7 +46,7 @@ export default function GpsDevicesTab() {
   };
 
   const fetchParcels = async () => {
-    const { data } = await supabase.from("parcels").select("name").order("name");
+    const { data } = await db.from("parcels").select("name").order("name");
     setParcels((data || []).map((p) => p.name));
   };
 
@@ -81,13 +82,13 @@ export default function GpsDevicesTab() {
     let deviceId: string;
 
     if (editing) {
-      const { error } = await supabase.from("gps_devices").update(payload).eq("id", editing.id);
+      const { error } = await db.from("gps_devices").update(payload).eq("id", editing.id);
       if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); setSubmitting(false); return; }
       deviceId = editing.id;
       // Delete old parcel links
-      await supabase.from("gps_device_parcels").delete().eq("device_id", deviceId);
+      await db.from("gps_device_parcels").delete().eq("device_id", deviceId);
     } else {
-      const { data, error } = await supabase.from("gps_devices").insert(payload).select("id").single();
+      const { data, error } = await db.from("gps_devices").insert(payload).select("id").single();
       if (error || !data) { toast({ title: "Error", description: error?.message || "Error al crear", variant: "destructive" }); setSubmitting(false); return; }
       deviceId = data.id;
     }
@@ -95,7 +96,7 @@ export default function GpsDevicesTab() {
     // Insert parcel links
     if (form.parcel_names.length > 0) {
       const rows = form.parcel_names.map((parcel_name) => ({ device_id: deviceId, parcel_name }));
-      await supabase.from("gps_device_parcels").insert(rows);
+      await db.from("gps_device_parcels").insert(rows);
     }
 
     toast({ title: editing ? "Dispositivo actualizado" : "Dispositivo registrado" });
@@ -106,7 +107,7 @@ export default function GpsDevicesTab() {
 
   const handleDelete = async (d: DeviceWithParcels) => {
     if (!confirm(`¿Eliminar dispositivo ${d.imei}?`)) return;
-    const { error } = await supabase.from("gps_devices").delete().eq("id", d.id);
+    const { error } = await db.from("gps_devices").delete().eq("id", d.id);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else { toast({ title: "Eliminado" }); fetchDevices(); }
   };
@@ -114,7 +115,7 @@ export default function GpsDevicesTab() {
   const togglePanicButton = async (d: DeviceWithParcels, next: boolean) => {
     // Optimistic
     setDevices((prev) => prev.map((x) => x.id === d.id ? { ...x, panic_button_enabled: next } as DeviceWithParcels : x));
-    const { error } = await supabase.from("gps_devices").update({ panic_button_enabled: next }).eq("id", d.id);
+    const { error } = await db.from("gps_devices").update({ panic_button_enabled: next }).eq("id", d.id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       fetchDevices();
