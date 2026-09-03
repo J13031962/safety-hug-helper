@@ -31,7 +31,7 @@ SELECT cron.schedule(
   'smartsos-process-relay-jobs',
   '* * * * *',
   $$
-  SELECT extensions.http_post(
+  SELECT net.http_post(
     url     := 'https://<PROJECT_REF>.supabase.co/functions/v1/process-relay-jobs',
     headers := '{"Content-Type":"application/json","Authorization":"Bearer <SERVICE_ROLE_KEY>"}'::jsonb,
     body    := '{"source":"cron"}'::jsonb
