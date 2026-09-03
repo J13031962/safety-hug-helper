@@ -1,39 +1,20 @@
-# Migración a Halcón: por qué la advertencia es segura
+# Activar SmartSOS sobre el schema `smartsos` en Halcón
 
-## Qué revisé en los archivos
+## Diagnóstico (verificado en la base de datos)
 
-Todos los objetos del script están escritos con el prefijo de schema `smartsos.`:
+- El schema `smartsos` ya existe en Halcón con sus **11 tablas** y datos cargados: 3 parcelaciones, 21 números registrados, 6 perfiles, 5 roles.
+- La app sigue leyendo el schema **`public`**, donde `registered_numbers`, `parcels` y `alarms` **no existen** en Halcón. Por eso falla el ingreso por número de celular (PhoneGate) y la pantalla de login no encuentra roles.
+- Falta un usuario de Auth: el script esperaba `harol.murcia@teleguardia.com`, pero en Halcón el correo real es **`harold.murcia@teleguardia.com`** (con "d"). Por eso hay 5 roles en lugar de 6.
 
-- `CREATE SCHEMA IF NOT EXISTS smartsos` y 11 tablas `CREATE TABLE IF NOT EXISTS smartsos.*`
-- Enum `smartsos.app_role`
-- Funciones `smartsos.has_role`, `smartsos.operator_parcel_names`, `smartsos.update_updated_at_column`, `smartsos.handle_new_user`
-- GRANTs y `ENABLE ROW LEVEL SECURITY` solo sobre `smartsos.*`
-- Los `DROP` presentes son únicamente `DROP POLICY IF EXISTS ... ON smartsos.<tabla>` y `DROP TRIGGER IF EXISTS update_ble_devices_updated_at ON smartsos.ble_devices`
+## Qué se hará
 
-No hay ningún `DROP TABLE`, `DROP SCHEMA`, `TRUNCATE`, `DELETE` ni referencia a tablas del schema `public` de Halcón. La advertencia de Supabase aparece porque el editor detecta las palabras `DROP` (de políticas) y las considera "destructivas" de forma genérica.
+1. **Apuntar el frontend al schema correcto**: definir `VITE_DB_SCHEMA="smartsos"` en `.env`. El código ya está preparado (`src/integrations/supabase/db.ts`), no hay que tocar pantallas.
+2. **Apuntar las Edge Functions**: crear el secreto `DB_SCHEMA=smartsos` y redesplegar las 9 funciones (`ble-button-event`, `traccar-webhook`, `send-whatsapp`, `send-sia-event`, `send-gps-command`, `process-relay-jobs`, `create-user`, `update-user`, `delete-user`).
+3. **Completar el rol faltante**: insertar en `smartsos.user_roles` el rol `director_monitoreo` para `harold.murcia@teleguardia.com` (y su perfil si falta), sin tocar nada de Halcón en `public`.
+4. **Verificar**: revisar que el schema `smartsos` esté expuesto en el Data API y comprobar en el navegador que (a) el ingreso por número de celular reconoce los 21 números y (b) el login por correo entra a `/admin` u `/operador` según el rol.
 
-## Los 3 únicos puntos que tocan objetos compartidos
+## Notas técnicas
 
-1. `CREATE EXTENSION IF NOT EXISTS pg_cron` — si Halcón ya la tiene, no hace nada.
-2. Trigger en `auth.users`: se llama `on_auth_user_created_smartsos` (nombre distinto al de Halcón) y el `DROP TRIGGER IF EXISTS` apunta solo a ese nombre. El trigger existente de Halcón no se toca. Si Supabase rechaza crearlo por permisos, se crea desde el dashboard.
-3. `ALTER PUBLICATION supabase_realtime ADD TABLE smartsos.alarms` (en 02_cron.sql) — agrega una tabla a la publicación, no quita las de Halcón.
-
-## Orden de ejecución sugerido
-
-1. Respaldo/punto de restauración del proyecto Halcón (opcional pero recomendado).
-2. Pegar el **contenido** de `01_schema.sql` en el SQL Editor y confirmar "Run query".
-3. Verificar: `SELECT table_name FROM information_schema.tables WHERE table_schema='smartsos';` (deben salir 11 tablas) y confirmar que `public` sigue intacto.
-4. Ejecutar `03_data.sql` (solo inserta en `smartsos.*`).
-5. Ejecutar `02_cron.sql` reemplazando `<PROJECT_REF>` por `junctwbyjtjhwjjioytc` y `<SERVICE_ROLE_KEY>` por la **Service Role Key** de Halcón (no la anon key que aparece en la API URL; es la clave aparte en Project Settings → API → Service Role).
-6. Recrear los 6 usuarios en Auth usando **los mismos emails** que ya existen en Halcón (no crear nuevos emails; solo invitar/crear con contraseña temporal). Luego ejecutar el bloque SQL de `04_auth_users.md` para perfiles, roles y asignaciones.
-
-Después de eso se adapta la app (`VITE_DB_SCHEMA=smartsos`, `DB_SCHEMA=smartsos`) y solo al final se desconecta Cloud. Los roles de Halcón en `public.user_roles` no se tocan: SmartSOS tendrá su propia tabla `smartsos.user_roles`.
-
-## Sobre exponer el schema en la API (paso ya hecho)
-
-Exponer `smartsos` en Settings > API es correcto y necesario para que la app lea/escriba vía Data API. Consideraciones:
-
-- Los toggles de "Exposed tables/functions" son por objeto: hay que verificar que las 11 tablas `smartsos.*` queden expuestas (y las funciones `has_role`, `operator_parcel_names` si se llaman por RPC).
-- Exponer el schema no otorga permisos por sí solo: el acceso real lo definen los GRANT y las políticas RLS del script, que ya están incluidos.
-- Que 70 de 82 tablas y 115 de 120 funciones estén expuestas es una configuración de Halcón; no hace falta cambiar el resto, solo asegurar los objetos de `smartsos`.
-- Verificación después de correr los scripts: `SELECT * FROM smartsos.parcels LIMIT 1;` desde el editor y una lectura desde la app con `VITE_DB_SCHEMA=smartsos`.
+- Las contraseñas de Auth no se migran: cada usuario entra con la contraseña temporal creada en Halcón (o "restablecer contraseña").
+- Los roles de SmartSOS viven en `smartsos.user_roles`, totalmente separados de `public.user_roles` de Halcón; los permisos actuales de Halcón no cambian.
+- Si tras el cambio aparecen errores de permisos de PostgREST, se corrigen con los `GRANT` que indique el `HINT`, siempre limitados al schema `smartsos`.
