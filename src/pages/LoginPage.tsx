@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/supabase/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +26,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     async function check() {
-      const { count } = await supabase
+      const { count } = await db
         .from("user_roles")
         .select("*", { count: "exact", head: true })
         .eq("role", "admin");

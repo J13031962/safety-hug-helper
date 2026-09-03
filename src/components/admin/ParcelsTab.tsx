@@ -117,7 +117,7 @@ export default function ParcelsTab() {
 
       if (data?.group_id) {
         // Save to parcel
-        const { error: updateErr } = await supabase
+        const { error: updateErr } = await db
           .from("parcels")
           .update({ whatsapp_group_id: data.group_id })
           .eq("id", resolveTarget.id);

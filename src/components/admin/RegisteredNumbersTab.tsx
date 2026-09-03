@@ -235,7 +235,7 @@ export default function RegisteredNumbersTab() {
       return;
     }
     setRenaming(true);
-    const { error } = await supabase
+    const { error } = await db
       .from("registered_numbers")
       .update({ parcel_name: renameTo.trim() })
       .eq("parcel_name", renameFrom);
@@ -252,7 +252,7 @@ export default function RegisteredNumbersTab() {
   const handleSaveCra = async (deviceId: string) => {
     setSavingCra(deviceId);
     const value = craEdits[deviceId]?.trim() || null;
-    const { error } = await supabase
+    const { error } = await db
       .from("gps_devices")
       .update({ cra_user_number: value })
       .eq("id", deviceId);

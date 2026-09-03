@@ -72,7 +72,7 @@ export default function OperatorDashboard() {
   // Fetch alarms
   useEffect(() => {
     const fetchAlarms = async () => {
-      const { data } = await supabase
+      const { data } = await db
         .from("alarms")
         .select("*")
         .order("created_at", { ascending: false })
