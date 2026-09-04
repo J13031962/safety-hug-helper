@@ -25,8 +25,7 @@ Ejemplo de lo que llega para la cuenta 9999:
 
 ## Detalles técnicos
 
-- Migración: tabla `smartsos.service_status` (`service` texto único, `status`, `changed_at`, `last_reason`, `updated_at`) con GRANTs (`select` a `authenticated`, `all` a `service_role`), RLS activo y política de lectura para usuarios autenticados; escritura solo vía `service_role`. Fila inicial `('whatsapp','up')`. Esta tabla no crece: es una fila por servicio.
-- Historial y limpieza diaria: tabla `smartsos.service_status_events` (`service`, `status`, `reason`, `created_at`) que guarda cada cambio de estado para poder auditar. Un cron diario (`smartsos-cleanup-service-events`, 03:10 UTC) borra los registros con más de 30 días, para que nunca se acumule basura.
+- Migración: tabla `smartsos.service_status` (`service` texto único, `status`, `changed_at`, `last_reason`, `updated_at`) con GRANTs (`select` a `authenticated`, `all` a `service_role`), RLS activo y política de lectura para usuarios autenticados; escritura solo vía `service_role`. Fila inicial `('whatsapp','up')`.
 - `send-sia-event`: agregar a `EVENT_CODES` → `trouble: "UT"` y `trouble_restore: "UR"`. Sin otros cambios de firma.
 - Nueva función `whatsapp-health`:
   - `GET/POST` sin cuerpo → hace el chequeo de estado contra el proveedor de WhatsApp actual (TextMeBot: consulta con `apikey`; si en el futuro se cambia el proveedor, solo se ajusta esta comprobación).
