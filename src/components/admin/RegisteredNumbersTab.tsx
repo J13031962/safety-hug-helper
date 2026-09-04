@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Phone, Shield, AlertTriangle, Save } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
@@ -36,6 +37,13 @@ interface GroupedUser {
 interface PhysicalButton {
   device: GpsDevice;
   parcel_name: string;
+}
+
+interface ServiceStatus {
+  service: string;
+  status: "up" | "down";
+  changed_at: string;
+  last_reason: string | null;
 }
 
 export default function RegisteredNumbersTab() {

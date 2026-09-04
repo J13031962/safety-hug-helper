@@ -178,6 +178,28 @@ Deno.serve(async (req) => {
     const failed = results.filter((r) => !r.ok).length;
     const firstError = results.find((r) => !r.ok)?.providerResponse ?? null;
 
+    // Report WhatsApp health status so the CRA is notified on transitions
+    try {
+      const { data: tokenRow } = await supabase
+        .from("service_config")
+        .select("value")
+        .eq("key", "whatsapp_health_cron_token")
+        .single();
+      const cronToken = tokenRow?.value;
+      if (cronToken) {
+        await supabase.functions.invoke("whatsapp-health", {
+          body: {
+            service: "whatsapp",
+            status: failed > 0 ? "down" : "up",
+            reason: failed > 0 ? firstError : "message_sent",
+          },
+          headers: { "x-cron-token": cronToken },
+        });
+      }
+    } catch (healthErr: any) {
+      console.error("[send-whatsapp] Failed to report whatsapp health:", healthErr.message);
+    }
+
     return new Response(
       JSON.stringify({ success: failed === 0, sent, failed, total: results.length, first_error: firstError }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
