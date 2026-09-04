@@ -2,9 +2,9 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { db } from "@/integrations/supabase/db";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "@/integrations/supabase/smartsos-types";
 
-type AppRole = Database["public"]["Enums"]["app_role"];
+type AppRole = Database["smartsos"]["Enums"]["app_role"];
 
 interface AuthContextType {
   session: Session | null;
