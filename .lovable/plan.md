@@ -19,12 +19,12 @@ Ejemplo de lo que llega para la cuenta 9999:
 
 3. **Detección al fallar un envío real**: cuando una alarma intenta mandar WhatsApp y el proveedor responde que el número está desconectado (u otro error de sesión), se marca el estado como caído y se disparan las señales `UT001`.
 
+4. **Chequeo automático cada 5 minutos**: un proceso programado consulta el estado del número en el proveedor. Si está desconectado y antes estaba bien → `UT001`. Si está conectado y antes estaba caído → `UR001`. Si no cambió nada, no envía nada.
 
-3. **Chequeo automático cada 5 minutos**: un proceso programado consulta el estado del número en el proveedor. Si está desconectado y antes estaba bien → `UT001`. Si está conectado y antes estaba caído → `UR001`. Si no cambió nada, no envía nada.
+5. **Envío a todas las parcelaciones**: las señales se mandan una por cada parcelación que tenga número de abonado CRA configurado, con zona `001`.
 
-4. **Envío a todas las parcelaciones**: las señales se mandan una por cada parcelación que tenga número de abonado CRA configurado, con zona `001`.
+6. **Visibilidad en el panel**: en /admin, en la sección de WhatsApp, se muestra el estado actual (Conectado / Desconectado desde tal hora) para que se sepa sin revisar registros.
 
-5. **Visibilidad en el panel**: en /admin, en la sección de WhatsApp, se muestra el estado actual (Conectado / Desconectado desde tal hora) para que se sepa sin revisar registros.
 
 ## Detalles técnicos
 
