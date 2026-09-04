@@ -13,19 +13,24 @@ Ejemplo de lo que llega para la cuenta 9999:
 
 ## Qué se va a construir
 
-1. **Registro del estado de WhatsApp**: una tabla nueva que guarda si el servicio está "arriba" o "caído", desde cuándo y el último motivo. Sirve para no mandar la misma señal repetida.
+1. **Registro del estado de WhatsApp**: una tabla nueva que guarda si el servicio está "arriba" o "caído", desde cuándo y el último motivo. Es **una sola fila por servicio** (se actualiza, no crece).
 
-2. **Detección al fallar un envío real**: cuando una alarma intenta mandar WhatsApp y el proveedor responde que el número está desconectado (u otro error de sesión), se marca el estado como caído y se disparan las señales `UT001`.
+2. **Bitácora de chequeos con limpieza diaria**: cada chequeo de 5 minutos deja un registro en una tabla de historial (para poder ver cuándo se cayó y cuánto duró). Esa tabla se limpia automáticamente **una vez al día**, borrando todo lo anterior a 7 días, para que no acumule basura.
 
-3. **Chequeo automático cada 5 minutos**: un proceso programado consulta el estado del número en el proveedor. Si está desconectado y antes estaba bien → `UT001`. Si está conectado y antes estaba caído → `UR001`. Si no cambió nada, no envía nada.
+3. **Detección al fallar un envío real**: cuando una alarma intenta mandar WhatsApp y el proveedor responde que el número está desconectado (u otro error de sesión), se marca el estado como caído y se disparan las señales `UT001`.
 
-4. **Envío a todas las parcelaciones**: las señales se mandan una por cada parcelación que tenga número de abonado CRA configurado, con zona `001`.
+4. **Chequeo automático cada 5 minutos**: un proceso programado consulta el estado del número en el proveedor. Si está desconectado y antes estaba bien → `UT001`. Si está conectado y antes estaba caído → `UR001`. Si no cambió nada, no envía nada.
 
-5. **Visibilidad en el panel**: en /admin, en la sección de WhatsApp, se muestra el estado actual (Conectado / Desconectado desde tal hora) para que se sepa sin revisar registros.
+5. **Envío a todas las parcelaciones**: las señales se mandan una por cada parcelación que tenga número de abonado CRA configurado, con zona `001`.
+
+6. **Visibilidad en el panel**: en /admin, en la sección de WhatsApp, se muestra el estado actual (Conectado / Desconectado desde tal hora) para que se sepa sin revisar registros.
+
 
 ## Detalles técnicos
 
-- Migración: tabla `smartsos.service_status` (`service` texto único, `status`, `changed_at`, `last_reason`, `updated_at`) con GRANTs (`select` a `authenticated`, `all` a `service_role`), RLS activo y política de lectura para usuarios autenticados; escritura solo vía `service_role`. Fila inicial `('whatsapp','up')`.
+- Migración: tabla `smartsos.service_status` (`service` texto único, `status`, `changed_at`, `last_reason`, `updated_at`) con GRANTs (`select` a `authenticated`, `all` a `service_role`), RLS activo y política de lectura para usuarios autenticados; escritura solo vía `service_role`. Fila inicial `('whatsapp','up')`. Esta tabla nunca crece: es 1 fila por servicio.
+- Migración: tabla `smartsos.service_status_log` (`service`, `status`, `reason`, `checked_at`) con índice por `checked_at`, mismos GRANTs y RLS. Guarda cada chequeo de 5 min.
+- Retención: función `smartsos.cleanup_service_status_log()` que hace `DELETE FROM smartsos.service_status_log WHERE checked_at < now() - interval '7 days'`, más un cron diario (`0 3 * * *`, `smartsos-cleanup-service-log`) que la ejecuta. Se documenta en `migration/halcon/02_cron.sql`.
 - `send-sia-event`: agregar a `EVENT_CODES` → `trouble: "UT"` y `trouble_restore: "UR"`. Sin otros cambios de firma.
 - Nueva función `whatsapp-health`:
   - `GET/POST` sin cuerpo → hace el chequeo de estado contra el proveedor de WhatsApp actual (TextMeBot: consulta con `apikey`; si en el futuro se cambia el proveedor, solo se ajusta esta comprobación).
