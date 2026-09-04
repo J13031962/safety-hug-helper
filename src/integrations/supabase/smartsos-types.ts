@@ -21,6 +21,6 @@ export type Database = GeneratedDatabase & {
   };
 };
 
-export type Tables<T extends string> = any;
-export type TablesInsert<T extends string> = any;
-export type TablesUpdate<T extends string> = any;
+export type Tables<T extends string> = Record<string, any>;
+export type TablesInsert<T extends string> = Record<string, any>;
+export type TablesUpdate<T extends string> = Record<string, any>;
