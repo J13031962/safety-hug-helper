@@ -28,7 +28,9 @@ Ejemplo de lo que llega para la cuenta 9999:
 
 ## Detalles técnicos
 
-- Migración: tabla `smartsos.service_status` (`service` texto único, `status`, `changed_at`, `last_reason`, `updated_at`) con GRANTs (`select` a `authenticated`, `all` a `service_role`), RLS activo y política de lectura para usuarios autenticados; escritura solo vía `service_role`. Fila inicial `('whatsapp','up')`.
+- Migración: tabla `smartsos.service_status` (`service` texto único, `status`, `changed_at`, `last_reason`, `updated_at`) con GRANTs (`select` a `authenticated`, `all` a `service_role`), RLS activo y política de lectura para usuarios autenticados; escritura solo vía `service_role`. Fila inicial `('whatsapp','up')`. Esta tabla nunca crece: es 1 fila por servicio.
+- Migración: tabla `smartsos.service_status_log` (`service`, `status`, `reason`, `checked_at`) con índice por `checked_at`, mismos GRANTs y RLS. Guarda cada chequeo de 5 min.
+- Retención: función `smartsos.cleanup_service_status_log()` que hace `DELETE FROM smartsos.service_status_log WHERE checked_at < now() - interval '7 days'`, más un cron diario (`0 3 * * *`, `smartsos-cleanup-service-log`) que la ejecuta. Se documenta en `migration/halcon/02_cron.sql`.
 - `send-sia-event`: agregar a `EVENT_CODES` → `trouble: "UT"` y `trouble_restore: "UR"`. Sin otros cambios de firma.
 - Nueva función `whatsapp-health`:
   - `GET/POST` sin cuerpo → hace el chequeo de estado contra el proveedor de WhatsApp actual (TextMeBot: consulta con `apikey`; si en el futuro se cambia el proveedor, solo se ajusta esta comprobación).
