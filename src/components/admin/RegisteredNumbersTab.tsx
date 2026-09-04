@@ -317,9 +317,28 @@ export default function RegisteredNumbersTab() {
   return (
     <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="flex items-center gap-2 font-display text-lg">
-          <Phone className="w-5 h-5" /> Números WhatsApp
-        </CardTitle>
+        <div className="flex flex-col gap-1">
+          <CardTitle className="flex items-center gap-2 font-display text-lg">
+            <Phone className="w-5 h-5" /> Números WhatsApp
+            {whatsappStatus?.status === "down" ? (
+              <Badge variant="destructive" className="text-xs gap-1">
+                <AlertTriangle className="w-3 h-3" /> Caído
+              </Badge>
+            ) : whatsappStatus?.status === "up" ? (
+              <Badge variant="outline" className="text-xs border-emerald-500/30 text-emerald-500 bg-emerald-500/10">
+                Conectado
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs">Verificando...</Badge>
+            )}
+          </CardTitle>
+          {whatsappStatus?.last_reason && (
+            <p className="text-xs text-muted-foreground">
+              {whatsappStatus.status === "down" ? "Último fallo" : "Último chequeo"}: {whatsappStatus.last_reason}
+              {whatsappStatus.changed_at && ` · ${new Date(whatsappStatus.changed_at).toLocaleString()}`}
+            </p>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => { setRenameFrom(""); setRenameTo(""); setRenameOpen(true); }}>
             <Pencil className="w-4 h-4 mr-1" /> Renombrar parcela
