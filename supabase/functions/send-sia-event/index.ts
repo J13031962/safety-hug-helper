@@ -17,6 +17,8 @@ const EVENT_CODES: Record<string, string> = {
   disaster: "BA",
   domestic: "HA",
   test: "TA",
+  trouble: "UT",
+  trouble_restore: "UR",
 };
 
 Deno.serve(async (req) => {

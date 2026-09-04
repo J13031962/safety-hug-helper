@@ -2,3 +2,6 @@ project_id = "junctwbyjtjhwjjioytc"
 
 [functions.traccar-webhook]
 verify_jwt = false
+
+[functions.whatsapp-health]
+verify_jwt = false

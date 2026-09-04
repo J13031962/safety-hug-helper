@@ -10,9 +10,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Phone, Shield, AlertTriangle, Save } from "lucide-react";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Tables } from "@/integrations/supabase/smartsos-types";
 
 type RegisteredNumber = Tables<"registered_numbers">;
 type GpsDevice = Tables<"gps_devices">;
@@ -38,6 +39,13 @@ interface PhysicalButton {
   parcel_name: string;
 }
 
+interface ServiceStatus {
+  service: string;
+  status: "up" | "down";
+  changed_at: string;
+  last_reason: string | null;
+}
+
 export default function RegisteredNumbersTab() {
   const [numbers, setNumbers] = useState<RegisteredNumber[]>([]);
   const [parcels, setParcels] = useState<Parcel[]>([]);
@@ -58,6 +66,42 @@ export default function RegisteredNumbersTab() {
   // Local edits for cra_user_number per device
   const [craEdits, setCraEdits] = useState<Record<string, string>>({});
   const [savingCra, setSavingCra] = useState<string | null>(null);
+
+  // WhatsApp service status from service_status
+  const [whatsappStatus, setWhatsappStatus] = useState<ServiceStatus | null>(null);
+
+  const fetchWhatsappStatus = async () => {
+    const { data, error } = await db
+      .from("service_status")
+      .select("service, status, changed_at, last_reason")
+      .eq("service", "whatsapp")
+      .single();
+    if (error) {
+      console.error("Failed to load whatsapp status:", error);
+      return;
+    }
+    setWhatsappStatus(data as ServiceStatus);
+  };
+
+  useEffect(() => {
+    fetchWhatsappStatus();
+    const channel = db
+      .channel("whatsapp-status")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "smartsos", table: "service_status" },
+        (payload) => {
+          const row = payload.new as ServiceStatus | undefined;
+          if (row?.service === "whatsapp") {
+            setWhatsappStatus(row);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      db.removeChannel(channel);
+    };
+  }, []);
 
   const uniqueParcels = useMemo(() => {
     const fromNumbers = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
@@ -273,9 +317,28 @@ export default function RegisteredNumbersTab() {
   return (
     <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="flex items-center gap-2 font-display text-lg">
-          <Phone className="w-5 h-5" /> Números WhatsApp
-        </CardTitle>
+        <div className="flex flex-col gap-1">
+          <CardTitle className="flex items-center gap-2 font-display text-lg">
+            <Phone className="w-5 h-5" /> Números WhatsApp
+            {whatsappStatus?.status === "down" ? (
+              <Badge variant="destructive" className="text-xs gap-1">
+                <AlertTriangle className="w-3 h-3" /> Caído
+              </Badge>
+            ) : whatsappStatus?.status === "up" ? (
+              <Badge variant="outline" className="text-xs border-emerald-500/30 text-emerald-500 bg-emerald-500/10">
+                Conectado
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs">Verificando...</Badge>
+            )}
+          </CardTitle>
+          {whatsappStatus?.last_reason && (
+            <p className="text-xs text-muted-foreground">
+              {whatsappStatus.status === "down" ? "Último fallo" : "Último chequeo"}: {whatsappStatus.last_reason}
+              {whatsappStatus.changed_at && ` · ${new Date(whatsappStatus.changed_at).toLocaleString()}`}
+            </p>
+          )}
+        </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => { setRenameFrom(""); setRenameTo(""); setRenameOpen(true); }}>
             <Pencil className="w-4 h-4 mr-1" /> Renombrar parcela

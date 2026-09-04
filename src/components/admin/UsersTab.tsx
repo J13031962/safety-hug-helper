@@ -11,9 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Users } from "lucide-react";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "@/integrations/supabase/smartsos-types";
 
-type AppRole = Database["public"]["Enums"]["app_role"];
+type AppRole = Database["smartsos"]["Enums"]["app_role"];
 
 interface UserWithRole {
   user_id: string;

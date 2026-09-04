@@ -10,8 +10,8 @@
 //
 // y todas las consultas (`db.from(...)`, `db.rpc(...)`) y el realtime apuntan
 // a ese schema sin tocar ninguna pantalla.
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "./types";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./smartsos-types";
 import { brokeredPreviewStorage } from "./previewAuthStorage";
 import { supabase } from "./client";
 
@@ -29,14 +29,14 @@ export const DB_SCHEMA: string =
  * Para auth (`supabase.auth`) y edge functions (`supabase.functions`) se sigue
  * usando el cliente autogenerado: comparten el mismo almacenamiento de sesión.
  */
-export const db =
+export const db: SupabaseClient<any> =
   DB_SCHEMA === "public"
-    ? supabase
-    : createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    ? (supabase as unknown as SupabaseClient<any>)
+    : (createClient<Database, "smartsos">(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: {
           storage: brokeredPreviewStorage(),
           persistSession: true,
           autoRefreshToken: true,
         },
-        db: { schema: DB_SCHEMA as "public" },
-      });
+        db: { schema: "smartsos" },
+      }) as unknown as SupabaseClient<any>);
