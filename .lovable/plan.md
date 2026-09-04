@@ -1,27 +1,29 @@
-# El botón físico no genera alarma: Traccar sigue avisando al servidor antiguo
+# Botón físico: el webhook ya recibe eventos; falta verificar alerta completa y WhatsApp
 
-## Qué está pasando (verificado)
+## Qué encontré ahora (logs actualizados)
 
-- El equipo de Teleguardia ("Sirena patio", IMEI 355468592594287) está **habilitado** para botón físico y está correctamente asociado a la parcelación **Teleguardia**. La configuración en la base de datos está bien.
-- Sin embargo, **el aviso del botón nunca llega**: en los últimos 30 días no existe ni una sola llamada al receptor de eventos (`traccar-webhook`) en el proyecto nuevo. Lo único que se ejecuta es el proceso que apaga sirenas, cada minuto.
-- Las alarmas más recientes son todas enviadas desde la app por personas; ninguna proviene del botón físico.
+El receptor `traccar-webhook` **sí está recibiendo llamadas** y procesando el botón físico del equipo Teleguardia (IMEI 355468592594287). Los registros más recientes muestran:
 
-Conclusión: al mudar la plataforma al nuevo servidor (Halcón), el servidor de GPS (Traccar) siguió enviando los avisos a la dirección **antigua**, que ya no existe. Por eso "en Traccar sí aparece el aviso" pero aquí no llega nada.
+- Evento `alarm` con `alarm=sos` → clasificado como pánico.
+- También evento `ignitionOn` con `position.attributes.alarm=sos` → clasificado como pánico.
+- Se insertaron alarmas en `smartsos.alarms` para la parcelación **Teleguardia**.
+- `send-gps-command` respondió éxito: la sirena se activó vía `engineStop` + comando GPRS `RELAY,1#`.
+- `send-sia-event` respondió éxito: mensaje `"SIA-DCS"0001L0#9999[#9999|PA004]_` enviado a la CRA.
+- `send-whatsapp` **falló**: `Error: Phone number is disconnected from the API (DB)`.
+
+Conclusión: el botón físico **sí dispara** la alarma, la sirena y SIA. Lo que no llega es el mensaje de WhatsApp porque la sesión de TextMeBot está desconectada.
 
 ## Qué hay que hacer
 
-1. **Actualizar la dirección de aviso en el servidor de GPS** (`gps.smarturban.co`, archivo de configuración de Traccar):
-   - Dirección nueva: `https://junctwbyjtjhwjjioytc.supabase.co/functions/v1/traccar-webhook?token=<TRACCAR_WEBHOOK_TOKEN>`
-   - Debe quedar activado el reenvío de eventos y reiniciar el servicio de Traccar.
-   - El valor del token es el mismo secreto `TRACCAR_WEBHOOK_TOKEN` que ya está guardado en la plataforma. Yo no puedo leerlo ni entrar a tu servidor de GPS: ese cambio lo tienes que aplicar tú (o pasarme el acceso).
-2. **Prueba real**: presionar el botón físico del equipo de Teleguardia y verificar en los registros que la llamada llega y que se crea la alarma únicamente en Teleguardia.
-3. **Si tras el cambio la llamada llega pero es rechazada**, revisar en los registros el motivo exacto (token inválido, tipo de evento no reconocido, equipo no registrado) y corregir sobre ese dato concreto. Sólo en ese caso tocaría código.
-4. **Documentar** en `docs/` y `roadmap.md` la dirección nueva de avisos de Traccar, para que no se pierda en futuras mudanzas.
+1. **Verificar que la alarma se ve en el panel de operador** (`/operador`). Si no aparece, revisar:
+   - Filtro de parcelación del operador logueado.
+   - Suscripción de realtime a `smartsos.alarms`.
+2. **Reconectar WhatsApp**:
+   - El error indica que el número emisor (`+573332789188`) se desconectó de TextMeBot. Hay que volver a vincularlo mediante el QR que ofrece TextMeBot.
+   - Una vez reconectado, volver a probar el botón físico.
+3. **Revisar duplicados**: en los logs se crearon dos alarmas separadas por el mismo botón con solo segundos de diferencia. Esto puede pasar porque la deduplicación de 30 s está en memoria y las Edge Functions son stateless. Si es un problema frecuente, mover la deduplicación a la base de datos (tabla `ble_events` ya lo hace; `traccar-webhook` aún usa Map en memoria).
+4. **Documentar** en `roadmap.md` que Traccar ya apunta al proyecto Halcón.
 
-## Detalle técnico
+## No se requieren cambios de código por ahora
 
-- `function_edge_logs` no registra ninguna invocación de `/functions/v1/traccar-webhook` en 30 días (proyecto `junctwbyjtjhwjjioytc`); un token inválido sí generaría un 401 registrado, por lo que el problema es anterior: Traccar no llama a esta URL.
-- `smartsos.gps_devices`: `panic_button_enabled = true` para IMEI 355468592594287 y 355468593809965; `false` para los otros dos.
-- `smartsos.gps_device_parcels` mapea 355468592594287 → Teleguardia (aislamiento correcto, una sola parcelación).
-- Secretos presentes en el proyecto nuevo: `TRACCAR_WEBHOOK_TOKEN`, `TRACCAR_EMAIL`, `TRACCAR_PASSWORD`, `DB_SCHEMA=smartsos`.
-- No se prevén cambios de código en `traccar-webhook` salvo que la prueba revele un rechazo por clasificación del evento.
+La ruta del botón físico está funcionando: Traccar → webhook → alarma → sirena + SIA. Solo falta restablecer WhatsApp y confirmar la visualización en el panel.
