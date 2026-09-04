@@ -1,29 +1,41 @@
-# Botón físico: el webhook ya recibe eventos; falta verificar alerta completa y WhatsApp
+# Aviso a la CRA cuando WhatsApp se cae (UT001 / UR001)
 
-## Qué encontré ahora (logs actualizados)
+## Objetivo
 
-El receptor `traccar-webhook` **sí está recibiendo llamadas** y procesando el botón físico del equipo Teleguardia (IMEI 355468592594287). Los registros más recientes muestran:
+Si el servicio de WhatsApp (hoy TextMeBot, o cualquiera que se use en el futuro) queda desconectado, la CRA recibe de inmediato la señal de falla técnica `UT001` en todas las cuentas de parcelación. Cuando WhatsApp vuelve a funcionar, la CRA recibe `UR001` (restauración). No se repite la señal mientras el estado no cambie.
 
-- Evento `alarm` con `alarm=sos` → clasificado como pánico.
-- También evento `ignitionOn` con `position.attributes.alarm=sos` → clasificado como pánico.
-- Se insertaron alarmas en `smartsos.alarms` para la parcelación **Teleguardia**.
-- `send-gps-command` respondió éxito: la sirena se activó vía `engineStop` + comando GPRS `RELAY,1#`.
-- `send-sia-event` respondió éxito: mensaje `"SIA-DCS"0001L0#9999[#9999|PA004]_` enviado a la CRA.
-- `send-whatsapp` **falló**: `Error: Phone number is disconnected from the API (DB)`.
+Ejemplo de lo que llega para la cuenta 9999:
 
-Conclusión: el botón físico **sí dispara** la alarma, la sirena y SIA. Lo que no llega es el mensaje de WhatsApp porque la sesión de TextMeBot está desconectada.
+```text
+"SIA-DCS"0001L0#9999[#9999|UT001]_
+"SIA-DCS"0001L0#9999[#9999|UR001]_
+```
 
-## Qué hay que hacer
+## Qué se va a construir
 
-1. **Verificar que la alarma se ve en el panel de operador** (`/operador`). Si no aparece, revisar:
-   - Filtro de parcelación del operador logueado.
-   - Suscripción de realtime a `smartsos.alarms`.
-2. **Reconectar WhatsApp**:
-   - El error indica que el número emisor (`+573332789188`) se desconectó de TextMeBot. Hay que volver a vincularlo mediante el QR que ofrece TextMeBot.
-   - Una vez reconectado, volver a probar el botón físico.
-3. **Revisar duplicados**: en los logs se crearon dos alarmas separadas por el mismo botón con solo segundos de diferencia. Esto puede pasar porque la deduplicación de 30 s está en memoria y las Edge Functions son stateless. Si es un problema frecuente, mover la deduplicación a la base de datos (tabla `ble_events` ya lo hace; `traccar-webhook` aún usa Map en memoria).
-4. **Documentar** en `roadmap.md` que Traccar ya apunta al proyecto Halcón.
+1. **Registro del estado de WhatsApp**: una tabla nueva que guarda si el servicio está "arriba" o "caído", desde cuándo y el último motivo. Sirve para no mandar la misma señal repetida.
 
-## No se requieren cambios de código por ahora
+2. **Detección al fallar un envío real**: cuando una alarma intenta mandar WhatsApp y el proveedor responde que el número está desconectado (u otro error de sesión), se marca el estado como caído y se disparan las señales `UT001`.
 
-La ruta del botón físico está funcionando: Traccar → webhook → alarma → sirena + SIA. Solo falta restablecer WhatsApp y confirmar la visualización en el panel.
+3. **Chequeo automático cada 5 minutos**: un proceso programado consulta el estado del número en el proveedor. Si está desconectado y antes estaba bien → `UT001`. Si está conectado y antes estaba caído → `UR001`. Si no cambió nada, no envía nada.
+
+4. **Envío a todas las parcelaciones**: las señales se mandan una por cada parcelación que tenga número de abonado CRA configurado, con zona `001`.
+
+5. **Visibilidad en el panel**: en /admin, en la sección de WhatsApp, se muestra el estado actual (Conectado / Desconectado desde tal hora) para que se sepa sin revisar registros.
+
+## Detalles técnicos
+
+- Migración: tabla `smartsos.service_status` (`service` texto único, `status`, `changed_at`, `last_reason`, `updated_at`) con GRANTs (`select` a `authenticated`, `all` a `service_role`), RLS activo y política de lectura para usuarios autenticados; escritura solo vía `service_role`. Fila inicial `('whatsapp','up')`.
+- `send-sia-event`: agregar a `EVENT_CODES` → `trouble: "UT"` y `trouble_restore: "UR"`. Sin otros cambios de firma.
+- Nueva función `whatsapp-health`:
+  - `GET/POST` sin cuerpo → hace el chequeo de estado contra el proveedor de WhatsApp actual (TextMeBot: consulta con `apikey`; si en el futuro se cambia el proveedor, solo se ajusta esta comprobación).
+  - Acepta también `{ service: "whatsapp", status: "down", reason }` desde `send-whatsapp` para reportar una falla detectada en un envío real.
+  - Compara con `smartsos.service_status`; si hay transición, recorre `smartsos.parcels` con `account_number` no nulo e invoca `send-sia-event` con `alarm_type: "trouble" | "trouble_restore"`, `parcel_name`, `cra_user_number: "001"`, `source: "whatsapp-health"`.
+  - Actualiza la fila de estado solo después de intentar el envío; registra el resultado en logs.
+- `send-whatsapp`: tras el POST al proveedor, si la respuesta contiene indicios de sesión caída (`disconnected`, `411`, etc.), invoca `whatsapp-health` con `status: "down"` (fire-and-forget, sin bloquear la alarma). Si el envío fue exitoso, reporta `status: "up"` para permitir la restauración inmediata.
+- Cron: agregar en Supabase un job cada 5 minutos que llame a `whatsapp-health` con `net.http_post` y la Service Role Key, igual al patrón ya usado por `process-relay-jobs`; se documenta en `migration/halcon/02_cron.sql`.
+- Frontend: `SettingsTab.tsx` (sección WhatsApp) lee `smartsos.service_status` para mostrar el estado; sin cambios en la lógica de alarmas.
+
+## Fuera de alcance
+
+- No se cambia el proveedor de WhatsApp ni se resuelve la desconexión de TextMeBot; este trabajo solo garantiza que la CRA se entere cuando ocurra.
