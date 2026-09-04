@@ -13,9 +13,12 @@ Ejemplo de lo que llega para la cuenta 9999:
 
 ## Qué se va a construir
 
-1. **Registro del estado de WhatsApp**: una tabla nueva que guarda si el servicio está "arriba" o "caído", desde cuándo y el último motivo. Sirve para no mandar la misma señal repetida.
+1. **Registro del estado de WhatsApp**: una tabla nueva que guarda si el servicio está "arriba" o "caído", desde cuándo y el último motivo. Es **una sola fila por servicio** (se actualiza, no crece).
 
-2. **Detección al fallar un envío real**: cuando una alarma intenta mandar WhatsApp y el proveedor responde que el número está desconectado (u otro error de sesión), se marca el estado como caído y se disparan las señales `UT001`.
+2. **Bitácora de chequeos con limpieza diaria**: cada chequeo de 5 minutos deja un registro en una tabla de historial (para poder ver cuándo se cayó y cuánto duró). Esa tabla se limpia automáticamente **una vez al día**, borrando todo lo anterior a 7 días, para que no acumule basura.
+
+3. **Detección al fallar un envío real**: cuando una alarma intenta mandar WhatsApp y el proveedor responde que el número está desconectado (u otro error de sesión), se marca el estado como caído y se disparan las señales `UT001`.
+
 
 3. **Chequeo automático cada 5 minutos**: un proceso programado consulta el estado del número en el proveedor. Si está desconectado y antes estaba bien → `UT001`. Si está conectado y antes estaba caído → `UR001`. Si no cambió nada, no envía nada.
 
