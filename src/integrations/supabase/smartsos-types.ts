@@ -5,9 +5,9 @@
 import type { Database as GeneratedDatabase } from "./types";
 
 type AnyTable = {
-  Row: Record<string, any>;
-  Insert: Record<string, any>;
-  Update: Record<string, any>;
+  Row: any;
+  Insert: any;
+  Update: any;
   Relationships: any[];
 };
 
