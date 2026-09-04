@@ -10,8 +10,8 @@
 //
 // y todas las consultas (`db.from(...)`, `db.rpc(...)`) y el realtime apuntan
 // a ese schema sin tocar ninguna pantalla.
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "./types";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./smartsos-types";
 import { brokeredPreviewStorage } from "./previewAuthStorage";
 import { supabase } from "./client";
 
