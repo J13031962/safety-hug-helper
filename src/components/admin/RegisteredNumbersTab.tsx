@@ -67,6 +67,42 @@ export default function RegisteredNumbersTab() {
   const [craEdits, setCraEdits] = useState<Record<string, string>>({});
   const [savingCra, setSavingCra] = useState<string | null>(null);
 
+  // WhatsApp service status from service_status
+  const [whatsappStatus, setWhatsappStatus] = useState<ServiceStatus | null>(null);
+
+  const fetchWhatsappStatus = async () => {
+    const { data, error } = await db
+      .from("service_status")
+      .select("service, status, changed_at, last_reason")
+      .eq("service", "whatsapp")
+      .single();
+    if (error) {
+      console.error("Failed to load whatsapp status:", error);
+      return;
+    }
+    setWhatsappStatus(data as ServiceStatus);
+  };
+
+  useEffect(() => {
+    fetchWhatsappStatus();
+    const channel = db
+      .channel("whatsapp-status")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "smartsos", table: "service_status" },
+        (payload) => {
+          const row = payload.new as ServiceStatus | undefined;
+          if (row?.service === "whatsapp") {
+            setWhatsappStatus(row);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      db.removeChannel(channel);
+    };
+  }, []);
+
   const uniqueParcels = useMemo(() => {
     const fromNumbers = numbers.map((n) => n.parcel_name).filter(Boolean) as string[];
     const fromParcelsTable = parcels.map((p) => p.name);
