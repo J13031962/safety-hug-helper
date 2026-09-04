@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Phone, Shield, AlertTriangle, Save } from "lucide-react";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Tables } from "@/integrations/supabase/smartsos-types";
 
 type RegisteredNumber = Tables<"registered_numbers">;
 type GpsDevice = Tables<"gps_devices">;
