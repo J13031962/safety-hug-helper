@@ -29,14 +29,14 @@ export const DB_SCHEMA: string =
  * Para auth (`supabase.auth`) y edge functions (`supabase.functions`) se sigue
  * usando el cliente autogenerado: comparten el mismo almacenamiento de sesión.
  */
-export const db: SupabaseClient<Database, "smartsos"> =
+export const db: SupabaseClient<any> =
   DB_SCHEMA === "public"
-    ? (supabase as unknown as SupabaseClient<Database, "smartsos">)
-    : createClient<Database, "smartsos">(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    ? (supabase as unknown as SupabaseClient<any>)
+    : (createClient<Database, "smartsos">(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: {
           storage: brokeredPreviewStorage(),
           persistSession: true,
           autoRefreshToken: true,
         },
         db: { schema: "smartsos" },
-      });
+      }) as unknown as SupabaseClient<any>);
