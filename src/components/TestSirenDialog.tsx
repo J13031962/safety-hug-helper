@@ -20,9 +20,10 @@ interface TestSirenDialogProps {
   onClose: () => void;
   userParcels: string[];
   userName?: string;
+  phoneNumber?: string;
 }
 
-export default function TestSirenDialog({ open, onClose, userParcels, userName }: TestSirenDialogProps) {
+export default function TestSirenDialog({ open, onClose, userParcels, userName, phoneNumber }: TestSirenDialogProps) {
   const [sirens, setSirens] = useState<SirenDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState<string | null>(null);
