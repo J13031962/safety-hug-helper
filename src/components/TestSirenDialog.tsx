@@ -100,7 +100,12 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName, 
       for (const parcel of parcels) {
         try {
           await supabase.functions.invoke("send-sia-event", {
-            body: { alarm_type: "test", parcel_name: parcel },
+            body: {
+              alarm_type: "test",
+              parcel_name: parcel,
+              phone_number: phoneNumber || undefined,
+              source: "test-siren",
+            },
           });
         } catch (e) {
           console.warn("[TestSiren] SIA invoke error:", parcel, e);
