@@ -20,9 +20,10 @@ interface TestSirenDialogProps {
   onClose: () => void;
   userParcels: string[];
   userName?: string;
+  phoneNumber?: string;
 }
 
-export default function TestSirenDialog({ open, onClose, userParcels, userName }: TestSirenDialogProps) {
+export default function TestSirenDialog({ open, onClose, userParcels, userName, phoneNumber }: TestSirenDialogProps) {
   const [sirens, setSirens] = useState<SirenDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [activating, setActivating] = useState<string | null>(null);
@@ -99,7 +100,12 @@ export default function TestSirenDialog({ open, onClose, userParcels, userName }
       for (const parcel of parcels) {
         try {
           await supabase.functions.invoke("send-sia-event", {
-            body: { alarm_type: "test", parcel_name: parcel },
+            body: {
+              alarm_type: "test",
+              parcel_name: parcel,
+              phone_number: phoneNumber || undefined,
+              source: "test-siren",
+            },
           });
         } catch (e) {
           console.warn("[TestSiren] SIA invoke error:", parcel, e);

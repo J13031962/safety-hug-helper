@@ -168,6 +168,7 @@ const IndexContent = () => {
         onClose={() => setTestDialogOpen(false)}
         userParcels={userParcelNames}
         userName={userName}
+        phoneNumber={settings.phoneNumber || ""}
       />
     </div>
   );
