@@ -725,6 +725,9 @@ export type Database = {
           aprobada_por_nombre: string | null
           cliente_nombre: string | null
           condiciones: string | null
+          contrato_firmado_at: string | null
+          contrato_firmado_por: string | null
+          contrato_firmado_por_nombre: string | null
           cotizacion_eliminada_at: string | null
           cotizacion_id: string
           cotizacion_numero: string | null
@@ -735,6 +738,9 @@ export type Database = {
           factura_generada_por_nombre: string | null
           factura_numero: string | null
           forma_pago: string | null
+          formato_hecho_at: string | null
+          formato_hecho_por: string | null
+          formato_hecho_por_nombre: string | null
           id: string
           instalacion_finalizada_at: string | null
           instalacion_finalizada_por: string | null
@@ -759,6 +765,7 @@ export type Database = {
           revisada_por: string | null
           revisada_por_nombre: string | null
           tiempo_entrega: string | null
+          tipo_cliente: string
           total_estimado: number | null
           updated_at: string
           validez_hasta: string | null
@@ -774,6 +781,9 @@ export type Database = {
           aprobada_por_nombre?: string | null
           cliente_nombre?: string | null
           condiciones?: string | null
+          contrato_firmado_at?: string | null
+          contrato_firmado_por?: string | null
+          contrato_firmado_por_nombre?: string | null
           cotizacion_eliminada_at?: string | null
           cotizacion_id: string
           cotizacion_numero?: string | null
@@ -784,6 +794,9 @@ export type Database = {
           factura_generada_por_nombre?: string | null
           factura_numero?: string | null
           forma_pago?: string | null
+          formato_hecho_at?: string | null
+          formato_hecho_por?: string | null
+          formato_hecho_por_nombre?: string | null
           id?: string
           instalacion_finalizada_at?: string | null
           instalacion_finalizada_por?: string | null
@@ -808,6 +821,7 @@ export type Database = {
           revisada_por?: string | null
           revisada_por_nombre?: string | null
           tiempo_entrega?: string | null
+          tipo_cliente?: string
           total_estimado?: number | null
           updated_at?: string
           validez_hasta?: string | null
@@ -823,6 +837,9 @@ export type Database = {
           aprobada_por_nombre?: string | null
           cliente_nombre?: string | null
           condiciones?: string | null
+          contrato_firmado_at?: string | null
+          contrato_firmado_por?: string | null
+          contrato_firmado_por_nombre?: string | null
           cotizacion_eliminada_at?: string | null
           cotizacion_id?: string
           cotizacion_numero?: string | null
@@ -833,6 +850,9 @@ export type Database = {
           factura_generada_por_nombre?: string | null
           factura_numero?: string | null
           forma_pago?: string | null
+          formato_hecho_at?: string | null
+          formato_hecho_por?: string | null
+          formato_hecho_por_nombre?: string | null
           id?: string
           instalacion_finalizada_at?: string | null
           instalacion_finalizada_por?: string | null
@@ -857,6 +877,7 @@ export type Database = {
           revisada_por?: string | null
           revisada_por_nombre?: string | null
           tiempo_entrega?: string | null
+          tipo_cliente?: string
           total_estimado?: number | null
           updated_at?: string
           validez_hasta?: string | null
@@ -3527,6 +3548,10 @@ export type Database = {
         Args: { _cotizacion_id: string }
         Returns: boolean
       }
+      cotpro_visible_servicio_cliente: {
+        Args: { _cotizacion_id: string }
+        Returns: boolean
+      }
       crear_observacion_supervisor:
         | {
             Args: {
@@ -3812,6 +3837,7 @@ export type Database = {
       is_dispatcher: { Args: { _user_id: string }; Returns: boolean }
       is_facturacion: { Args: never; Returns: boolean }
       is_inventory_admin: { Args: never; Returns: boolean }
+      is_servicio_cliente: { Args: never; Returns: boolean }
       puede_mantener_datos: { Args: never; Returns: boolean }
       purgar_alarmas_antes_de: { Args: { _fecha: string }; Returns: number }
       purgar_auditoria_turnos_antes_de: {
