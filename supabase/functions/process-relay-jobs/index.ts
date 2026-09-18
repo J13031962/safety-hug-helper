@@ -46,6 +46,7 @@ async function postCommandAttempt(
     method: "POST",
     headers: { Cookie: cookie, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(8_000),
   });
 
   const body = await res.text();
@@ -59,60 +60,38 @@ async function postCommandAttempt(
   };
 }
 
-function getRelayTextCommands(action: string): string[] {
+function getRelayTextCommand(action: string): string | null {
   if (action === "engineStop") {
-    return ["RELAY,1#", "relay,1#", "222#"];
+    return "RELAY,1#";
   }
 
   if (action === "engineResume") {
-    return ["RELAY,0#", "relay,0#", "333#"];
+    return "RELAY,0#";
   }
 
-  return [];
+  return null;
 }
 
 async function sendCommand(cookie: string, deviceId: number, action: string): Promise<boolean> {
-  const attempts: CommandAttemptResult[] = [];
-
-  const nativeAttempt = await postCommandAttempt(cookie, "native", {
-    deviceId,
-    type: action,
-    description: `TeleGuardia ${action}`,
-    attributes: {},
-  });
-  attempts.push(nativeAttempt);
-
-  if (action === "engineStop" || action === "engineResume") {
-    const fallbackAttempt = await postCommandAttempt(cookie, "fallback-command", {
+  const commandPromises: Promise<CommandAttemptResult>[] = [
+    postCommandAttempt(cookie, "native", {
       deviceId,
-      type: "command",
+      type: action,
       description: `TeleGuardia ${action}`,
-      data: { command: action },
-    });
-    attempts.push(fallbackAttempt);
-
-    const relayCommands = getRelayTextCommands(action);
-
-    for (const relayCommand of relayCommands) {
-      const customGprsAttempt = await postCommandAttempt(cookie, `custom-gprs-${relayCommand}`, {
-        deviceId,
-        type: "custom",
-        textChannel: false,
-        description: `TeleGuardia ${action} relay gprs`,
-        attributes: { data: relayCommand },
-      });
-      attempts.push(customGprsAttempt);
-
-      const customSmsAttempt = await postCommandAttempt(cookie, `custom-sms-${relayCommand}`, {
-        deviceId,
-        type: "custom",
-        textChannel: true,
-        description: `TeleGuardia ${action} relay sms`,
-        attributes: { data: relayCommand },
-      });
-      attempts.push(customSmsAttempt);
-    }
+      attributes: {},
+    }),
+  ];
+  const relayCommand = getRelayTextCommand(action);
+  if (relayCommand) {
+    commandPromises.push(postCommandAttempt(cookie, `custom-gprs-${relayCommand}`, {
+      deviceId,
+      type: "custom",
+      textChannel: false,
+      description: `TeleGuardia ${action} relay gprs`,
+      attributes: { data: relayCommand },
+    }));
   }
+  const attempts = await Promise.all(commandPromises);
 
   const success = attempts.some((a) => a.ok);
   if (success) {
@@ -164,9 +143,7 @@ Deno.serve(async (req) => {
     console.log(`[Worker] Processing ${jobs.length} pending relay jobs`);
 
     const cookie = await traccarLogin();
-    let processed = 0;
-
-    for (const job of jobs) {
+    const settled = await Promise.allSettled(jobs.map(async (job: any) => {
       const { data: markedRows, error: markError } = await supabase
         .from("gps_relay_jobs")
         .update({ status: "processing" })
@@ -176,11 +153,11 @@ Deno.serve(async (req) => {
 
       if (markError) {
         console.error(`[Worker] Failed to mark job ${job.id} as processing:`, markError.message);
-        continue;
+        return false;
       }
 
       if (!markedRows?.length) {
-        continue;
+        return false;
       }
 
       // Before sending engineStop (siren OFF), check if a newer alarm extended the relay
@@ -200,7 +177,7 @@ Deno.serve(async (req) => {
               .from("gps_relay_jobs")
               .update({ status: "cancelled", completed_at: new Date().toISOString(), error_message: "Relay extendido por alarma más reciente" })
               .eq("id", job.id);
-            continue;
+            return false;
           }
         }
       }
@@ -229,14 +206,17 @@ Deno.serve(async (req) => {
             .eq("imei", job.imei);
         }
 
-        processed++;
+        return true;
       } else {
         await supabase
           .from("gps_relay_jobs")
           .update({ status: "error", error_message: "Command rejected by Traccar" })
           .eq("id", job.id);
+        return false;
       }
-    }
+    }));
+
+    const processed = settled.filter((result) => result.status === "fulfilled" && result.value).length;
 
     console.log(`[Worker] Done. Processed: ${processed}/${jobs.length}`);
 

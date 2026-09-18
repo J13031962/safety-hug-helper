@@ -211,20 +211,8 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
       return;
     }
 
-    // Try WhatsApp
-    try {
-      const { error: whatsErr } = await supabase.functions.invoke("send-whatsapp", { body: alarmData });
-      if (whatsErr) {
-        setWhatsappWarning("No se enviaron mensajes WhatsApp. Configura las API keys de CallMeBot en los números registrados.");
-      }
-    } catch {
-      setWhatsappWarning("No se enviaron mensajes WhatsApp. Configura las API keys de CallMeBot en los números registrados.");
-    }
-
-    // Try GPS siren/relay activation
-    let gpsWarning: string | null = null;
-    try {
-      const { data: gpsData, error: gpsErr } = await supabase.functions.invoke("send-gps-command", {
+    const whatsappPromise = supabase.functions.invoke("send-whatsapp", { body: alarmData });
+    const gpsPromise = supabase.functions.invoke("send-gps-command", {
         body: {
           alarm_id: alarmId,
           alarm_type: type,
@@ -232,6 +220,29 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
           parcel_name: alarmData.parcel_name,
         },
       });
+    const siaPromise = supabase.functions.invoke("send-sia-event", {
+      body: {
+        alarm_type: type,
+        parcel_name: alarmData.parcel_name,
+        phone_number: alarmData.phone_number,
+      },
+    });
+
+    const [whatsappResult, gpsResult, siaResult] = await Promise.allSettled([
+      whatsappPromise,
+      gpsPromise,
+      siaPromise,
+    ]);
+
+    if (whatsappResult.status === "rejected" || whatsappResult.value.error) {
+      setWhatsappWarning("No se enviaron mensajes WhatsApp. Verifica la conexión de WhatsApp.");
+    }
+
+    let gpsWarning: string | null = null;
+    if (gpsResult.status === "rejected") {
+      gpsWarning = "No se pudo activar la sirena GPS.";
+    } else {
+      const { data: gpsData, error: gpsErr } = gpsResult.value;
       if (gpsErr) {
         console.warn("[GPS] Error activando dispositivos:", gpsErr);
         gpsWarning = "No se pudo activar la sirena GPS.";
@@ -243,9 +254,6 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
           gpsWarning = gpsData.message || "No se pudo activar la sirena GPS.";
         }
       }
-    } catch (gpsEx) {
-      console.warn("[GPS] Error activando dispositivos:", gpsEx);
-      gpsWarning = "No se pudo activar la sirena GPS.";
     }
 
     if (gpsWarning) {
@@ -255,16 +263,11 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
       });
     }
 
-    // Try SIA-DCS event to CRA
     let siaWarning: string | null = null;
-    try {
-      const { data: siaData, error: siaErr } = await supabase.functions.invoke("send-sia-event", {
-        body: {
-          alarm_type: type,
-          parcel_name: alarmData.parcel_name,
-          phone_number: alarmData.phone_number,
-        },
-      });
+    if (siaResult.status === "rejected") {
+      siaWarning = "No se pudo enviar evento a la CRA.";
+    } else {
+      const { data: siaData, error: siaErr } = siaResult.value;
       if (siaErr) {
         console.warn("[SIA] Error:", siaErr);
         siaWarning = "No se pudo enviar evento a la CRA.";
@@ -274,9 +277,6 @@ export default function ConfirmDialog({ open, type, onClose, initialLocation, pa
           siaWarning = siaData.message || "No se pudo enviar evento a la CRA.";
         }
       }
-    } catch (siaEx) {
-      console.warn("[SIA] Error:", siaEx);
-      siaWarning = "No se pudo enviar evento a la CRA.";
     }
 
     if (siaWarning) {

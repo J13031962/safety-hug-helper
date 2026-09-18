@@ -70,6 +70,7 @@ async function postCommandAttempt(
     method: "POST",
     headers: { Cookie: cookie, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(8_000),
   });
 
   const body = await res.text();
@@ -83,16 +84,16 @@ async function postCommandAttempt(
   };
 }
 
-function getRelayTextCommands(action: DeviceAction): string[] {
+function getRelayTextCommand(action: DeviceAction): string | null {
   if (action === "engineStop") {
-    return ["RELAY,1#", "relay,1#", "222#"];
+    return "RELAY,1#";
   }
 
   if (action === "engineResume") {
-    return ["RELAY,0#", "relay,0#", "333#"];
+    return "RELAY,0#";
   }
 
-  return [];
+  return null;
 }
 
 async function sendDeviceCommand(
@@ -101,47 +102,25 @@ async function sendDeviceCommand(
   action: DeviceAction,
 ): Promise<{ success: boolean; response?: string; error?: string; attempts: CommandAttemptResult[] }> {
   try {
-    const attempts: CommandAttemptResult[] = [];
-
-    const nativeAttempt = await postCommandAttempt(cookie, "native", {
-      deviceId,
-      type: action,
-      description: `TeleGuardia ${action}`,
-      attributes: {},
-    });
-    attempts.push(nativeAttempt);
-
-    if (action === "engineStop" || action === "engineResume") {
-      const fallbackAttempt = await postCommandAttempt(cookie, "fallback-command", {
+    const commandPromises: Promise<CommandAttemptResult>[] = [
+      postCommandAttempt(cookie, "native", {
         deviceId,
-        type: "command",
+        type: action,
         description: `TeleGuardia ${action}`,
-        data: { command: action },
-      });
-      attempts.push(fallbackAttempt);
-
-      const relayCommands = getRelayTextCommands(action);
-
-      for (const relayCommand of relayCommands) {
-        const customGprsAttempt = await postCommandAttempt(cookie, `custom-gprs-${relayCommand}`, {
-          deviceId,
-          type: "custom",
-          textChannel: false,
-          description: `TeleGuardia ${action} relay gprs`,
-          attributes: { data: relayCommand },
-        });
-        attempts.push(customGprsAttempt);
-
-        const customSmsAttempt = await postCommandAttempt(cookie, `custom-sms-${relayCommand}`, {
-          deviceId,
-          type: "custom",
-          textChannel: true,
-          description: `TeleGuardia ${action} relay sms`,
-          attributes: { data: relayCommand },
-        });
-        attempts.push(customSmsAttempt);
-      }
+        attributes: {},
+      }),
+    ];
+    const relayCommand = getRelayTextCommand(action);
+    if (relayCommand) {
+      commandPromises.push(postCommandAttempt(cookie, `custom-gprs-${relayCommand}`, {
+        deviceId,
+        type: "custom",
+        textChannel: false,
+        description: `TeleGuardia ${action} relay gprs`,
+        attributes: { data: relayCommand },
+      }));
     }
+    const attempts = await Promise.all(commandPromises);
 
     const successful = attempts.filter((a) => a.ok);
     if (successful.length > 0) {
@@ -373,7 +352,7 @@ Deno.serve(async (req) => {
 
     const { data: allDevices } = await supabase
       .from("gps_devices")
-      .select("id, imei, relay_duration, relay_active_until")
+      .select("id, imei, name, relay_duration, relay_active_until")
       .in("id", deviceIds);
 
     const targetDevices = allDevices || [];
@@ -381,16 +360,28 @@ Deno.serve(async (req) => {
     console.log(`[GPS] Parcel: "${finalParcel}" | Matched devices: ${targetDevices.length}`);
 
     const now = new Date();
-    const results: any[] = [];
 
-    for (const device of targetDevices) {
+    const settled = await Promise.allSettled(targetDevices.map(async (device: any) => {
       const duration = device.relay_duration ?? 30;
       const executeAt = new Date(now.getTime() + duration * 1000);
 
+      const { data: eventRow } = await supabase.from("gps_command_events").insert({
+        alarm_id: alarm_id || null,
+        gps_device_id: device.id,
+        imei: device.imei,
+        device_name: device.name || null,
+        parcel_name: finalParcel,
+        action: "engineStop",
+        source: alarm_type === "test" ? "test" : "alarm",
+        status: "pending",
+      }).select("id").single();
+
       const traccarDeviceId = await findDeviceId(cookie, device.imei);
       if (!traccarDeviceId) {
-        results.push({ imei: device.imei, success: false, error: `IMEI ${device.imei} not in Traccar` });
-        continue;
+        if (eventRow?.id) await supabase.from("gps_command_events").update({
+          status: "offline", response_message: "El IMEI no existe en Traccar", requires_review: true, completed_at: new Date().toISOString(),
+        }).eq("id", eventRow.id);
+        return { imei: device.imei, success: false, error: `IMEI ${device.imei} not in Traccar` };
       }
 
       await supabase
@@ -413,8 +404,11 @@ Deno.serve(async (req) => {
       const stopResult = await sendDeviceCommand(cookie, traccarDeviceId, "engineStop");
 
       if (!stopResult.success) {
-        results.push({ imei: device.imei, success: false, error: stopResult.error, attempts: stopResult.attempts });
-        continue;
+        if (eventRow?.id) await supabase.from("gps_command_events").update({
+          traccar_device_id: traccarDeviceId, status: "rejected", response_message: stopResult.error,
+          attempts: stopResult.attempts, requires_review: true, completed_at: new Date().toISOString(),
+        }).eq("id", eventRow.id);
+        return { imei: device.imei, success: false, error: stopResult.error, attempts: stopResult.attempts };
       }
 
       const { error: jobError } = await supabase
@@ -432,14 +426,24 @@ Deno.serve(async (req) => {
         console.error(`[GPS] Failed creating relay job for ${device.imei}:`, jobError.message);
       }
 
-      results.push({
+      if (eventRow?.id) await supabase.from("gps_command_events").update({
+        traccar_device_id: traccarDeviceId, status: "accepted_unconfirmed",
+        response_message: stopResult.response || null, attempts: stopResult.attempts,
+        accepted_at: new Date().toISOString(),
+      }).eq("id", eventRow.id);
+
+      return {
         imei: device.imei,
         success: true,
         relay_duration: duration,
         stop_at: executeAt.toISOString(),
         attempts: stopResult.attempts,
-      });
-    }
+      };
+    }));
+
+    const results = settled.map((result) => result.status === "fulfilled"
+      ? result.value
+      : { success: false, error: result.reason instanceof Error ? result.reason.message : "Error inesperado" });
 
     return new Response(JSON.stringify({
       success: results.some((r) => r.success),
