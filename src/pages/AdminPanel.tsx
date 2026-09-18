@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LogOut, ArrowLeft, Shield, Users, Phone, Radio, Bell, Settings, FileText, MapPin } from "lucide-react";
+import { LogOut, ArrowLeft, Shield, Users, Phone, Radio, Bell, Settings, FileText, MapPin, Activity } from "lucide-react";
 import UsersTab from "@/components/admin/UsersTab";
 import RegisteredNumbersTab from "@/components/admin/RegisteredNumbersTab";
 import GpsDevicesTab from "@/components/admin/GpsDevicesTab";
@@ -11,6 +11,7 @@ import AlarmsHistoryTab from "@/components/admin/AlarmsHistoryTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import ReportsTab from "@/components/admin/ReportsTab";
 import ParcelsTab from "@/components/admin/ParcelsTab";
+import SirenStatusTab from "@/components/admin/SirenStatusTab";
 
 export default function AdminPanel() {
   const { user, role, loading, signOut } = useAuth();
@@ -60,7 +61,7 @@ export default function AdminPanel() {
       {/* Content */}
       <main className="max-w-6xl mx-auto px-4 py-6">
         <Tabs defaultValue="users">
-          <TabsList className="grid w-full grid-cols-7 mb-6">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 h-auto mb-6">
             <TabsTrigger value="users" className="gap-1 text-xs sm:text-sm">
               <Users className="w-4 h-4" /> <span className="hidden sm:inline">Usuarios</span>
             </TabsTrigger>
@@ -72,6 +73,9 @@ export default function AdminPanel() {
             </TabsTrigger>
             <TabsTrigger value="gps" className="gap-1 text-xs sm:text-sm">
               <Radio className="w-4 h-4" /> <span className="hidden sm:inline">GPS</span>
+            </TabsTrigger>
+            <TabsTrigger value="siren-status" className="gap-1 text-xs sm:text-sm">
+              <Activity className="w-4 h-4" /> <span className="hidden sm:inline">Sirenas</span>
             </TabsTrigger>
             <TabsTrigger value="alarms" className="gap-1 text-xs sm:text-sm">
               <Bell className="w-4 h-4" /> <span className="hidden sm:inline">Alarmas</span>
@@ -88,6 +92,7 @@ export default function AdminPanel() {
           <TabsContent value="numbers"><RegisteredNumbersTab /></TabsContent>
           <TabsContent value="parcels"><ParcelsTab /></TabsContent>
           <TabsContent value="gps"><GpsDevicesTab /></TabsContent>
+          <TabsContent value="siren-status"><SirenStatusTab /></TabsContent>
           <TabsContent value="alarms"><AlarmsHistoryTab /></TabsContent>
           <TabsContent value="reports"><ReportsTab /></TabsContent>
           <TabsContent value="settings"><SettingsTab /></TabsContent>

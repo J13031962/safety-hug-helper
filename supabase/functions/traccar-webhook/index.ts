@@ -91,6 +91,50 @@ Deno.serve(async (req) => {
     const payload = await req.json();
     console.log("[TraccarWH] Payload:", JSON.stringify(payload));
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(supabaseUrl, supabaseKey, dbOptions);
+
+    if (norm(payload?.event?.type) === "commandresult") {
+      const result = String(payload?.event?.attributes?.result || payload?.position?.attributes?.result || "").trim();
+      const resultLower = result.toLowerCase();
+      const commandImei = String(payload?.device?.uniqueId || "").trim();
+
+      if (commandImei && result) {
+        const { data: pendingEvent } = await sb
+          .from("gps_command_events")
+          .select("id, action")
+          .eq("imei", commandImei)
+          .eq("status", "accepted_unconfirmed")
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (pendingEvent) {
+          const rejected = resultLower.includes("error");
+          const confirmsStop = pendingEvent.action === "engineStop" &&
+            (resultLower.includes("cut off") || resultLower.includes("cutoff")) && !resultLower.includes("resume");
+          const confirmsResume = pendingEvent.action === "engineResume" &&
+            (resultLower.includes("restore") || resultLower.includes("resume"));
+          const confirmed = !rejected && (resultLower.includes("success") || confirmsStop || confirmsResume);
+
+          await sb.from("gps_command_events").update({
+            status: rejected ? "rejected" : confirmed ? "confirmed" : "accepted_unconfirmed",
+            response_message: result,
+            requires_review: rejected,
+            confirmed_at: confirmed ? new Date().toISOString() : null,
+            completed_at: rejected || confirmed ? new Date().toISOString() : null,
+          }).eq("id", pendingEvent.id);
+        }
+      }
+
+      console.log(`[TraccarWH] Command result recorded for IMEI=${commandImei || "unknown"}: ${result || "empty"}`);
+      return new Response(JSON.stringify({ success: true, ignored: true, reason: "commandResult_recorded" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { panic, reason } = classify(payload);
     if (!panic) {
       console.log(`[TraccarWH] Ignored: ${reason}`);
@@ -130,10 +174,6 @@ Deno.serve(async (req) => {
     for (const [k, ts] of RECENT_SOS) {
       if (now - ts > SOS_DEDUP_WINDOW_MS * 2) RECENT_SOS.delete(k);
     }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const sb = createClient(supabaseUrl, supabaseKey, dbOptions);
 
     // Find the device by IMEI
     const { data: device, error: deviceErr } = await sb

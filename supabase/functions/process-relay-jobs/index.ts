@@ -73,27 +73,25 @@ function getRelayTextCommand(action: string): string | null {
 }
 
 async function sendCommand(cookie: string, deviceId: number, action: string): Promise<boolean> {
-  const attempts: CommandAttemptResult[] = [];
-
-  const nativeAttempt = await postCommandAttempt(cookie, "native", {
-    deviceId,
-    type: action,
-    description: `TeleGuardia ${action}`,
-    attributes: {},
-  });
-  attempts.push(nativeAttempt);
-
+  const commandPromises: Promise<CommandAttemptResult>[] = [
+    postCommandAttempt(cookie, "native", {
+      deviceId,
+      type: action,
+      description: `TeleGuardia ${action}`,
+      attributes: {},
+    }),
+  ];
   const relayCommand = getRelayTextCommand(action);
   if (relayCommand) {
-    const customGprsAttempt = await postCommandAttempt(cookie, `custom-gprs-${relayCommand}`, {
+    commandPromises.push(postCommandAttempt(cookie, `custom-gprs-${relayCommand}`, {
       deviceId,
       type: "custom",
       textChannel: false,
       description: `TeleGuardia ${action} relay gprs`,
       attributes: { data: relayCommand },
-    });
-    attempts.push(customGprsAttempt);
+    }));
   }
+  const attempts = await Promise.all(commandPromises);
 
   const success = attempts.some((a) => a.ok);
   if (success) {

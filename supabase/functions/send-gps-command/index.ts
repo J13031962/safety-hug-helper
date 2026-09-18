@@ -102,27 +102,25 @@ async function sendDeviceCommand(
   action: DeviceAction,
 ): Promise<{ success: boolean; response?: string; error?: string; attempts: CommandAttemptResult[] }> {
   try {
-    const attempts: CommandAttemptResult[] = [];
-
-    const nativeAttempt = await postCommandAttempt(cookie, "native", {
-      deviceId,
-      type: action,
-      description: `TeleGuardia ${action}`,
-      attributes: {},
-    });
-    attempts.push(nativeAttempt);
-
+    const commandPromises: Promise<CommandAttemptResult>[] = [
+      postCommandAttempt(cookie, "native", {
+        deviceId,
+        type: action,
+        description: `TeleGuardia ${action}`,
+        attributes: {},
+      }),
+    ];
     const relayCommand = getRelayTextCommand(action);
     if (relayCommand) {
-      const customGprsAttempt = await postCommandAttempt(cookie, `custom-gprs-${relayCommand}`, {
+      commandPromises.push(postCommandAttempt(cookie, `custom-gprs-${relayCommand}`, {
         deviceId,
         type: "custom",
         textChannel: false,
         description: `TeleGuardia ${action} relay gprs`,
         attributes: { data: relayCommand },
-      });
-      attempts.push(customGprsAttempt);
+      }));
     }
+    const attempts = await Promise.all(commandPromises);
 
     const successful = attempts.filter((a) => a.ok);
     if (successful.length > 0) {

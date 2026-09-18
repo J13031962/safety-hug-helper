@@ -7,6 +7,9 @@
 - [x] Artefactos SQL de migración en `migration/halcon/` (schema, datos, cron, usuarios, guía)
 - [x] Frontend con schema configurable (`src/integrations/supabase/db.ts`, `VITE_DB_SCHEMA`)
 - [x] 9 Edge Functions con schema configurable (`supabase/functions/_shared/dbSchema.ts`, secreto `DB_SCHEMA`)
+- [x] Envío simultáneo e independiente a todos los GPS de una parcelación
+- [x] Diagnóstico de CASA VIEJA 2 y CASA VIEJA 3 sin activar sus salidas
+- [x] Historial de confirmaciones y fallos GPS para administradores y directores
 
 ## Pendiente (decisión tuya)
 - [ ] Ejecutar `01_schema.sql` y `03_data.sql` en el SQL Editor del proyecto destino (solo si quieres schema aislado `smartsos`)
